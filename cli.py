@@ -66,27 +66,13 @@ def print_header():
     f = Figlet(font="slant")
     console.print(f.renderText("NEPEM Cert"), style="bold blue")
     
-    # Layout para as caixas de informação
-    layout = Layout()
-    layout.split_column(
-        Layout(name="header"),
-        Layout(name="info_boxes")
-    )
-    
-    # Divisão para as caixas de informação lado a lado
-    layout["info_boxes"].split_row(
-        Layout(name="version"),
-        Layout(name="connection")
-    )
-    
-    # Conteúdo das caixas - limitando a 3 linhas
-    layout["version"].update(
-        Panel(
-            Text(f"[bold]Versão:[/bold] {APP_VERSION}"),
-            title="Informações do Sistema",
-            border_style="green",
-            height=3
-        )
+    # Divisão para as caixas de informação lado a lado (lado a lado sem layout aninhado)
+    version_panel = Panel(
+        f"[bold]Versão:[/bold] {APP_VERSION}",
+        title="Informações do Sistema",
+        border_style="green",
+        height=3,
+        padding=(0, 2)
     )
     
     connection_status = check_connection_status()
@@ -95,19 +81,20 @@ def print_header():
         "Desconectado": "red",
         "Aguardando": "yellow"
     }.get(connection_status, "yellow")
-    
-    layout["connection"].update(
-        Panel(
-            Text(f"[bold]Status:[/bold] [{status_color}]{connection_status}[/{status_color}]"),
-            title="Conexão com Servidor",
-            border_style=status_color,
-            height=3
-        )
+    connection_panel = Panel(
+        f"[bold]Status:[/bold] [{status_color}]{connection_status}[/{status_color}]",
+        title="Conexão com Servidor",
+        border_style=status_color,
+        height=3,
+        padding=(0, 2)
     )
     
-    console.print(layout["info_boxes"])
+    # Exibe os painéis lado a lado
+    console.print(Align.center(version_panel, vertical="top"), connection_panel)
+    
+    # Reduz espaço entre painéis e menu
     console.print("\n[bold cyan]Gerador de Certificados em Lote[/bold cyan]")
-    console.print("[dim]Use os comandos abaixo para gerenciar seus certificados.[/dim]\n")
+    console.print("[dim]Use os comandos abaixo para gerenciar seus certificados.[/dim]")
 
 
 def main_menu():
@@ -1204,14 +1191,17 @@ def check_connection():
         "Aguardando": "yellow"
     }.get(result["status"], "yellow")
     
-    console.print(f"[bold]Status:[/bold] [{status_color}]{result['status']}[/{status_color}]")
-    console.print(f"[bold]Mensagem:[/bold] {result['message']}")
-    console.print(f"[bold]Horário:[/bold] {result['timestamp']}")
+    # Criar textos formatados do Rich para evitar que as tags apareçam
+    console.print(Text.from_markup(f"[bold]Status:[/bold] "), end="")
+    console.print(Text(result["status"], style=status_color))
+    
+    console.print(Text.from_markup(f"[bold]Mensagem:[/bold] {result['message']}"))
+    console.print(Text.from_markup(f"[bold]Horário:[/bold] {result['timestamp']}"))
     
     if "server_url" in connectivity_manager.config and connectivity_manager.config["server_url"]:
-        console.print(f"[bold]URL do servidor:[/bold] {connectivity_manager.config['server_url']}")
+        console.print(Text.from_markup(f"[bold]URL do servidor:[/bold] {connectivity_manager.config['server_url']}"))
     else:
-        console.print("[yellow]Servidor não configurado.[/yellow]")
+        console.print(Text("Servidor não configurado.", style="yellow"))
     
     console.print("\n[dim]Pressione Enter para voltar ao menu...[/dim]")
     input()
