@@ -37,13 +37,16 @@ class PDFGenerator:
         """
         Gera múltiplos PDFs a partir de uma lista de conteúdos HTML.
         Retorna uma lista de caminhos para os PDFs gerados.
+        
+        Nota: file_names deve conter os caminhos completos para os arquivos de saída.
         """
         if len(html_contents) != len(file_names):
             raise ValueError("O número de conteúdos HTML e nomes de arquivo deve ser igual")
         
         pdf_paths = []
         for i, html in enumerate(html_contents):
-            file_path = os.path.join(self.output_dir, file_names[i])
+            # Usamos o caminho completo fornecido, sem adicionar self.output_dir novamente
+            file_path = file_names[i]
             self.generate_pdf(html, file_path)
             pdf_paths.append(file_path)
         

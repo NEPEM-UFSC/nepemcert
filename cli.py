@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
 """
 NEPEM Certificados - Interface de Linha de Comando
 Ferramenta para geração de certificados em lote.
@@ -24,8 +22,9 @@ import questionary
 from pyfiglet import Figlet
 import pandas as pd
 import time
-from datetime import datetime
 import random
+import string
+from datetime import datetime
 
 # Importação dos módulos da aplicação
 from app.csv_manager import CSVManager
@@ -34,12 +33,14 @@ from app.pdf_generator import PDFGenerator
 from app.field_mapper import FieldMapper
 from app.zip_exporter import ZipExporter
 from app.connectivity_manager import ConnectivityManager
+from app.parameter_manager import ParameterManager
+from app.theme_manager import ThemeManager
 
 # Configuração do console Rich
 console = Console()
 
 # Versão do aplicativo
-APP_VERSION = "1.0.0"
+APP_VERSION = "1.1.0"
 
 # Inicialização dos gerenciadores
 csv_manager = CSVManager()
@@ -48,6 +49,8 @@ pdf_generator = PDFGenerator()
 field_mapper = FieldMapper()
 zip_exporter = ZipExporter()
 connectivity_manager = ConnectivityManager()
+parameter_manager = ParameterManager()
+theme_manager = ThemeManager()
 
 
 def check_connection_status():
@@ -271,10 +274,10 @@ def show_help():
     O NEPEM Cert é uma ferramenta para geração de certificados em lote. Você pode:
     
     1. **Gerar Certificados em Lote**:
-       - Importe dados de participantes em CSV
+       - Importe um CSV com os nomes dos participantes
+       - Forneça detalhes do evento (nome, data, local, carga horária)
        - Selecione um template HTML
-       - Configure o mapeamento de campos
-       - Gere os certificados
+       - Gere os certificados com códigos de verificação únicos
     
     2. **Gerenciar Templates**:
        - Crie, edite e visualize templates HTML
@@ -301,8 +304,7 @@ def show_help():
     input()
 
 
-# Funções de implementação para o menu de geração de certificados
-
+# Função de geração de certificados implementada conforme o fluxo solicitado
 def generate_batch_certificates():
     """Gera certificados em lote."""
     console.clear()
@@ -310,7 +312,7 @@ def generate_batch_certificates():
     
     # Selecionar arquivo CSV
     csv_path = questionary.path(
-        "Selecione o arquivo CSV com dados dos participantes:",
+        "Selecione o arquivo CSV com nomes dos participantes:",
         validate=lambda path: os.path.exists(path) and path.endswith('.csv')
     ).ask()
     
@@ -318,14 +320,82 @@ def generate_batch_certificates():
         console.print("[yellow]Operação cancelada.[/yellow]")
         return
     
+    # Verificar se o CSV tem cabeçalho
+    has_header = questionary.confirm("O arquivo CSV possui linha de cabeçalho?").ask()
+    
     # Carregar dados do CSV
     with console.status("[bold green]Carregando dados do CSV..."):
         try:
-            df = pd.read_csv(csv_path)
+            if has_header:
+                df = pd.read_csv(csv_path)
+            else:
+                df = pd.read_csv(csv_path, header=None, names=["nome"])
+            
+            # Verificar se o CSV tem apenas uma coluna
+            if len(df.columns) > 1:
+                console.print("[bold red]Erro:[/bold red] O arquivo CSV deve conter apenas uma coluna com os nomes dos participantes.")
+                console.print(f"Colunas encontradas: {', '.join(df.columns)}")
+                return
+            
+            # Garantir que a coluna se chame "nome" para compatibilidade
+            if df.columns[0] != "nome":
+                df.columns = ["nome"]
+            
             num_records = len(df)
-            console.print(f"[green]✓[/green] Dados carregados com sucesso. {num_records} registros encontrados.")
+            console.print(f"[green]✓[/green] Dados carregados com sucesso. {num_records} participantes encontrados.")
         except Exception as e:
             console.print(f"[bold red]Erro ao carregar CSV:[/bold red] {str(e)}")
+            return
+    
+    # Solicitar informações do evento
+    console.print("\n[bold]Informações do Evento[/bold]")
+    evento = questionary.text("Nome do evento:").ask()
+    data = questionary.text("Data do evento (ex: 15/05/2023):", default=datetime.now().strftime("%d/%m/%Y")).ask()
+    local = questionary.text("Local do evento:").ask()
+    carga_horaria = questionary.text("Carga horária (horas):").ask()
+    
+    # Revisar informações
+    while True:
+        console.clear()
+        console.print("[bold blue]== Revisão das Informações do Evento ==[/bold blue]\n")
+        
+        table = Table(box=box.SIMPLE)
+        table.add_column("Campo", style="cyan")
+        table.add_column("Valor")
+        
+        table.add_row("Nome do evento", evento)
+        table.add_row("Data", data)
+        table.add_row("Local", local)
+        table.add_row("Carga horária", f"{carga_horaria} horas")
+        table.add_row("Número de participantes", str(num_records))
+        
+        console.print(table)
+        
+        # Perguntar se deseja modificar algo
+        choice = questionary.select(
+            "Deseja modificar alguma informação?",
+            choices=[
+                "Não, continuar",
+                "Modificar nome do evento",
+                "Modificar data",
+                "Modificar local",
+                "Modificar carga horária",
+                "Cancelar operação"
+            ]
+        ).ask()
+        
+        if choice == "Não, continuar":
+            break
+        elif choice == "Modificar nome do evento":
+            evento = questionary.text("Nome do evento:", default=evento).ask()
+        elif choice == "Modificar data":
+            data = questionary.text("Data do evento:", default=data).ask()
+        elif choice == "Modificar local":
+            local = questionary.text("Local do evento:", default=local).ask()
+        elif choice == "Modificar carga horária":
+            carga_horaria = questionary.text("Carga horária (horas):", default=carga_horaria).ask()
+        elif choice == "Cancelar operação":
+            console.print("[yellow]Operação cancelada.[/yellow]")
             return
     
     # Selecionar template
@@ -333,7 +403,7 @@ def generate_batch_certificates():
     if not templates:
         console.print("[yellow]Nenhum template disponível. Por favor, importe um template primeiro.[/yellow]")
         return
-        
+    
     template_name = questionary.select(
         "Selecione o template a ser utilizado:",
         choices=templates
@@ -343,35 +413,57 @@ def generate_batch_certificates():
         console.print("[yellow]Operação cancelada.[/yellow]")
         return
     
+    # Selecionar tema
+    themes = ["Nenhum"] + theme_manager.list_themes()
+    selected_theme = questionary.select(
+        "Selecione um tema para os certificados:",
+        choices=themes
+    ).ask()
+    
+    theme = None if selected_theme == "Nenhum" else selected_theme
+    
     # Carregar template
     with console.status("[bold green]Carregando template..."):
         template_content = template_manager.load_template(template_name)
         if not template_content:
             console.print(f"[bold red]Erro ao carregar template:[/bold red] Arquivo não encontrado.")
             return
-    
-    # Mapear campos
-    console.print("\n[bold]Mapeamento de campos[/bold]")
-    csv_columns = df.columns.tolist()
-    
-    # Obter placeholders do template (implementação simplificada)
-    placeholders = []
-    for col in csv_columns:
-        if col in template_content:
-            placeholders.append(col)
-    
-    if not placeholders:
-        console.print("[yellow]Aviso: Não foram encontrados placeholders compatíveis no template.[/yellow]")
         
-        # Permitir continuar mesmo sem placeholders
-        continue_anyway = questionary.confirm(
-            "Deseja continuar mesmo assim?"
-        ).ask()
-        
-        if not continue_anyway:
-            return
+        # Aplicar tema se selecionado
+        if theme:
+            theme_settings = theme_manager.load_theme(theme)
+            if theme_settings:
+                template_content = theme_manager.apply_theme_to_template(template_content, theme_settings)
+                console.print(f"[green]✓[/green] Tema '{theme}' aplicado ao template.")
     
-    # Configurar caminho de saída para os certificados
+    # Mostrar e revisar parâmetros institucionais
+    institutional_params = parameter_manager.get_institutional_placeholders()
+    
+    console.print("\n[bold]Parâmetros Institucionais[/bold]")
+    if institutional_params:
+        table = Table(box=box.SIMPLE)
+        table.add_column("Campo", style="cyan")
+        table.add_column("Valor")
+        
+        for campo, valor in institutional_params.items():
+            table.add_row(campo, valor)
+        
+        console.print(table)
+        
+        # Perguntar se deseja modificar os parâmetros
+        modify = questionary.confirm("Deseja modificar os parâmetros institucionais?").ask()
+        
+        if modify:
+            for campo, valor in institutional_params.items():
+                novo_valor = questionary.text(f"{campo}:", default=valor).ask()
+                institutional_params[campo] = novo_valor
+            
+            # Atualizar parâmetros
+            parameter_manager.update_institutional_placeholders(institutional_params)
+            console.print("[green]✓[/green] Parâmetros institucionais atualizados.")
+    else:
+        console.print("[yellow]Nenhum parâmetro institucional configurado.[/yellow]")
+      # Configurar diretório de saída
     output_dir = questionary.path(
         "Pasta de destino para os certificados:",
         default=pdf_generator.output_dir,
@@ -380,11 +472,21 @@ def generate_batch_certificates():
     
     if not output_dir:
         output_dir = pdf_generator.output_dir
+    else:
+        # Atualizar o diretório de saída do gerador de PDF
+        pdf_generator.output_dir = output_dir
+        # Garantir que o diretório exista
+        os.makedirs(output_dir, exist_ok=True)
     
     # Confirmação final
     console.print("\n[bold]Resumo da operação:[/bold]")
-    console.print(f"- Arquivo CSV: [cyan]{csv_path}[/cyan] ({num_records} registros)")
+    console.print(f"- Evento: [cyan]{evento}[/cyan]")
+    console.print(f"- Data: [cyan]{data}[/cyan]")
+    console.print(f"- Local: [cyan]{local}[/cyan]")
+    console.print(f"- Carga horária: [cyan]{carga_horaria} horas[/cyan]")
+    console.print(f"- Participantes: [cyan]{num_records}[/cyan]")
     console.print(f"- Template: [cyan]{template_name}[/cyan]")
+    console.print(f"- Tema: [cyan]{selected_theme}[/cyan]")
     console.print(f"- Destino: [cyan]{output_dir}[/cyan]")
     
     confirm = questionary.confirm("Deseja iniciar a geração dos certificados?").ask()
@@ -393,9 +495,21 @@ def generate_batch_certificates():
         console.print("[yellow]Operação cancelada.[/yellow]")
         return
     
-    # Processar e gerar os certificados
+    # Gerar certificados
     html_contents = []
     file_names = []
+    
+    # Preparar informações comuns para todos os certificados
+    common_data = {
+        "evento": evento,
+        "data": data,
+        "local": local,
+        "carga_horaria": carga_horaria,
+    }
+    
+    # Extrair placeholders do template
+    placeholders = template_manager.extract_placeholders(template_content)
+    console.print(f"\n[bold]Placeholders encontrados no template:[/bold] {len(placeholders)}")
     
     with Progress(
         SpinnerColumn(),
@@ -407,46 +521,62 @@ def generate_batch_certificates():
         for index, row in df.iterrows():
             progress.update(task, description=f"[green]Processando certificado {index+1}/{num_records}...")
             
-            # Preparar dados para o template
-            data = row.to_dict()
+            # Combinar dados do participante com as informações comuns
+            participante_data = {"nome": row["nome"]}
+            
+            # Gerar código de verificação único
+            codigo = f"CERT-{participante_data['nome'].strip()[0:2].upper()}-{datetime.now().strftime('%Y')}-{index+1:03d}"
+            participante_data["codigo_verificacao"] = codigo
+            
+            # Adicionar data de emissão
+            participante_data["data_emissao"] = datetime.now().strftime("%d/%m/%Y")
+            
+            # Mesclar todos os dados
+            csv_data = {**common_data, **participante_data}
+            final_data = parameter_manager.merge_placeholders(csv_data, theme)
             
             # Gerar nome do arquivo
-            # Usar o nome do participante ou um campo de identificação se disponível
-            if "nome" in data:
-                file_name = f"certificado_{data['nome'].strip().replace(' ', '_')}.pdf"
-            else:
-                file_name = f"certificado_{index+1}.pdf"
-                
-            # Caminho completo para o arquivo
+            file_name = f"certificado_{participante_data['nome'].strip().replace(' ', '_')}.pdf"
             file_path = os.path.join(output_dir, file_name)
             
-            # Gerar HTML com os dados substituídos (simplificado)
-            html_content = template_content
-            for key, value in data.items():
-                placeholder = f"{{{{{key}}}}}"
-                if placeholder in html_content:
-                    html_content = html_content.replace(placeholder, str(value))
+            # Preparar template temporário para renderização
+            temp_name = f"temp_{random.randint(1000, 9999)}.html"
+            temp_path = os.path.join("templates", temp_name)
             
-            # Adicionar à lista
-            html_contents.append(html_content)
-            file_names.append(file_path)
+            try:
+                # Salvar template temporário
+                with open(temp_path, "w", encoding="utf-8") as f:
+                    f.write(template_content)
+                
+                # Renderizar template com os dados
+                html_content = template_manager.render_template(temp_name, final_data)
+                
+                # Adicionar à lista para geração em lote
+                html_contents.append(html_content)
+                file_names.append(file_path)
+            except Exception as e:
+                console.print(f"[bold red]Erro ao processar certificado {index+1}:[/bold red] {str(e)}")
+            finally:
+                # Limpar arquivo temporário
+                if os.path.exists(temp_path):
+                    os.remove(temp_path)
             
             progress.update(task, advance=1)
     
-    # Gerar PDFs em batch
+    # Gerar PDFs em lote
     console.print("\n[bold]Gerando arquivos PDF...[/bold]")
     
     try:
         generated_paths = pdf_generator.batch_generate(html_contents, file_names)
         console.print(f"[bold green]✓ {len(generated_paths)} certificados gerados com sucesso![/bold green]")
         
-        # Oferecer opção para empacotar em ZIP
+        # Oferecer opção para criar ZIP
         zip_option = questionary.confirm("Deseja empacotar os certificados em um arquivo ZIP?").ask()
         
         if zip_option:
             zip_name = questionary.text(
                 "Nome do arquivo ZIP:",
-                default=f"certificados_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+                default=f"{evento.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.zip"
             ).ask()
             
             if not zip_name.endswith('.zip'):
@@ -482,9 +612,16 @@ def preview_imported_data():
         console.print("[yellow]Operação cancelada.[/yellow]")
         return
     
+    # Verificar se o CSV tem cabeçalho
+    has_header = questionary.confirm("O arquivo CSV possui linha de cabeçalho?").ask()
+    
     # Carregar e mostrar dados
     try:
-        df = pd.read_csv(csv_path)
+        df = pd.read_csv(csv_path, header=0 if has_header else None)
+        
+        # Se não há cabeçalho, atribuir um nome à coluna
+        if not has_header:
+            df.columns = ["nome"]
         
         # Criar tabela Rich
         table = Table(title=f"Dados do arquivo: {os.path.basename(csv_path)}")
@@ -545,9 +682,8 @@ def test_certificate_generation():
         input("\nPressione Enter para voltar...")
         return
     
-    # Identificar placeholders (implementação simplificada)
-    import re
-    placeholders = re.findall(r'{{([^}]+)}}', template_content)
+    # Identificar placeholders
+    placeholders = template_manager.extract_placeholders(template_content)
     
     if not placeholders:
         console.print("[yellow]Aviso: Não foram encontrados placeholders no template.[/yellow]")
@@ -562,18 +698,29 @@ def test_certificate_generation():
         value = questionary.text(f"Valor para '{placeholder}':").ask()
         test_data[placeholder] = value
     
-    # Gerar HTML com os valores substituídos
-    html_content = template_content
-    for key, value in test_data.items():
-        placeholder = f"{{{{{key}}}}}"
-        html_content = html_content.replace(placeholder, str(value))
-    
     # Gerar PDF de teste
     output_path = os.path.join(pdf_generator.output_dir, "certificado_teste.pdf")
     
     try:
         with console.status("[bold green]Gerando certificado de teste..."):
-            pdf_generator.generate_pdf(html_content, output_path)
+            # Gerar HTML com os valores substituídos usando o template_manager
+            temp_name = f"temp_test_{random.randint(1000, 9999)}.html"
+            temp_path = os.path.join("templates", temp_name)
+            
+            try:
+                # Salvar template temporário
+                with open(temp_path, "w", encoding="utf-8") as f:
+                    f.write(template_content)
+                
+                # Renderizar o template com os dados
+                html_content = template_manager.render_template(temp_name, test_data)
+                
+                # Gerar PDF
+                pdf_generator.generate_pdf(html_content, output_path)
+            finally:
+                # Limpar arquivo temporário
+                if os.path.exists(temp_path):
+                    os.remove(temp_path)
         
         console.print(f"[bold green]✓ Certificado de teste gerado com sucesso![/bold green]")
         console.print(f"[bold]Caminho:[/bold] {output_path}")
@@ -822,8 +969,7 @@ def preview_template():
         return
     
     # Detectar placeholders no template
-    import re
-    placeholders = re.findall(r'{{([^}]+)}}', template_content)
+    placeholders = template_manager.extract_placeholders(template_content)
     
     console.print(f"[bold]Template:[/bold] {template_name}\n")
     
@@ -847,18 +993,29 @@ def preview_template():
         for placeholder in placeholders:
             example_data[placeholder] = f"Exemplo de {placeholder}"
         
-        # Substituir placeholders pelos dados de exemplo
-        preview_content = template_content
-        for key, value in example_data.items():
-            placeholder = f"{{{{{key}}}}}"
-            preview_content = preview_content.replace(placeholder, str(value))
-        
         # Gerar PDF de prévia
         preview_path = os.path.join(pdf_generator.output_dir, "preview_template.pdf")
         
         try:
             with console.status("[bold green]Gerando prévia em PDF..."):
-                pdf_generator.generate_pdf(preview_content, preview_path)
+                # Preparar template temporário
+                temp_name = f"temp_preview_{random.randint(1000, 9999)}.html"
+                temp_path = os.path.join("templates", temp_name)
+                
+                try:
+                    # Salvar template temporário
+                    with open(temp_path, "w", encoding="utf-8") as f:
+                        f.write(template_content)
+                    
+                    # Renderizar com dados de exemplo
+                    html_content = template_manager.render_template(temp_name, example_data)
+                    
+                    # Gerar PDF
+                    pdf_generator.generate_pdf(html_content, preview_path)
+                finally:
+                    # Limpar arquivo temporário
+                    if os.path.exists(temp_path):
+                        os.remove(temp_path)
             
             console.print(f"[bold green]✓ Prévia gerada com sucesso![/bold green]")
             console.print(f"[bold]Caminho:[/bold] {preview_path}")
@@ -883,7 +1040,7 @@ def preview_template():
     input()
 
 
-# Funções de implementação para as demais opções de menu (a serem expandidas posteriormente)
+# Funções de implementação para as demais opções de menu (básicas)
 
 def configure_directories():
     """Configura os diretórios de trabalho."""
@@ -899,7 +1056,111 @@ def configure_appearance():
 
 def configure_generation_parameters():
     """Configura parâmetros de geração de certificados."""
-    console.print("[yellow]Função ainda não implementada.[/yellow]")
+    console.clear()
+    console.print("[bold blue]== Parâmetros de Geração de Certificados ==[/bold blue]\n")
+    
+    choice = questionary.select(
+        "O que você deseja configurar?",
+        choices=[
+            "📝 Valores para campos institucionais",
+            "🔤 Valores padrão para campos",
+            "🖼️ Valores específicos para temas",
+            "↩️ Voltar"
+        ]
+    ).ask()
+    
+    if choice == "📝 Valores para campos institucionais":
+        configure_institutional_placeholders()
+    elif choice == "🔤 Valores padrão para campos":
+        configure_default_placeholders()
+    elif choice == "🖼️ Valores específicos para temas":
+        configure_theme_placeholders()
+    elif choice == "↩️ Voltar":
+        return
+
+
+def configure_institutional_placeholders():
+    """Configura valores institucionais."""
+    console.clear()
+    console.print("[bold blue]== Configuração de Campos Institucionais ==[/bold blue]\n")
+    
+    # Carregar valores institucionais existentes
+    institutional = parameter_manager.get_institutional_placeholders()
+    
+    # Exibir valores atuais
+    if institutional:
+        console.print("[bold]Valores atuais:[/bold]")
+        table = Table(show_header=True, header_style="bold blue", box=box.SIMPLE)
+        table.add_column("Campo", style="cyan")
+        table.add_column("Valor")
+        
+        for field, value in institutional.items():
+            table.add_row(field, value)
+        
+        console.print(table)
+    else:
+        console.print("[yellow]Nenhum valor institucional configurado.[/yellow]")
+    
+    # Menu de opções
+    choice = questionary.select(
+        "O que você deseja fazer?",
+        choices=[
+            "➕ Adicionar/editar campo",
+            "🗑️ Remover campo",
+            "↩️ Voltar"
+        ]
+    ).ask()
+    
+    if choice == "➕ Adicionar/editar campo":
+        field = questionary.text("Nome do campo:").ask()
+        if field:
+            value = questionary.text(f"Valor para '{field}':").ask()
+            if field and value:
+                parameter_manager.update_institutional_placeholders({field: value})
+                console.print(f"[green]✓[/green] Campo '{field}' atualizado.")
+                
+                # Recarregar esta tela para mostrar valores atualizados
+                configure_institutional_placeholders()
+    
+    elif choice == "🗑️ Remover campo":
+        if not institutional:
+            console.print("[yellow]Não há campos para remover.[/yellow]")
+            input("\nPressione Enter para voltar...")
+            configure_institutional_placeholders()
+            return
+            
+        field_to_remove = questionary.select(
+            "Selecione o campo para remover:",
+            choices=list(institutional.keys()) + ["Cancelar"]
+        ).ask()
+        
+        if field_to_remove and field_to_remove != "Cancelar":
+            confirm = questionary.confirm(f"Tem certeza que deseja remover '{field_to_remove}'?").ask()
+            if confirm:
+                params = parameter_manager.parameters
+                if "institutional_placeholders" in params and field_to_remove in params["institutional_placeholders"]:
+                    del params["institutional_placeholders"][field_to_remove]
+                    parameter_manager.save_parameters()
+                    console.print(f"[green]✓[/green] Campo '{field_to_remove}' removido.")
+                
+                # Recarregar esta tela para mostrar valores atualizados
+                configure_institutional_placeholders()
+    
+    elif choice == "↩️ Voltar":
+        configure_generation_parameters()
+
+
+def configure_default_placeholders():
+    """Configura valores padrão."""
+    # Implementação básica
+    console.print("[yellow]Função ainda não implementada completamente.[/yellow]")
+    input("\nPressione Enter para voltar...")
+
+
+def configure_theme_placeholders():
+    """Configura valores para temas."""
+    # Implementação básica
+    console.print("[yellow]Função ainda não implementada completamente.[/yellow]")
     input("\nPressione Enter para voltar...")
 
 
@@ -938,273 +1199,30 @@ def check_connection():
 
 def configure_remote_server():
     """Configura servidor remoto."""
-    console.clear()
-    console.print("[bold blue]== Configuração de Servidor Remoto ==[/bold blue]\n")
-    
-    current_url = connectivity_manager.config.get("server_url", "")
-    if current_url:
-        console.print(f"URL atual do servidor: [cyan]{current_url}[/cyan]")
-    
-    # Solicitar nova URL
-    new_url = questionary.text(
-        "Digite a URL do servidor remoto:",
-        default=current_url
-    ).ask()
-    
-    if not new_url:
-        console.print("[yellow]Operação cancelada.[/yellow]")
-        console.print("\n[dim]Pressione Enter para voltar ao menu...[/dim]")
-        input()
-        return
-    
-    # Verificar formato básico da URL
-    if not (new_url.startswith('http://') or new_url.startswith('https://')):
-        suggestion = f"https://{new_url}"
-        use_suggestion = questionary.confirm(
-            f"A URL deve começar com http:// ou https://. Deseja usar '{suggestion}' em vez disso?"
-        ).ask()
-        
-        if use_suggestion:
-            new_url = suggestion
-    
-    # Salvar a nova URL
-    connectivity_manager.set_server_url(new_url)
-    console.print(f"[bold green]✓ URL do servidor configurada: [/bold green] {new_url}")
-    
-    # Verificar conexão com a nova URL
-    check_now = questionary.confirm("Deseja verificar a conexão agora?").ask()
-    
-    if check_now:
-        with console.status("[bold green]Verificando conexão..."):
-            result = connectivity_manager.check_connection()
-        
-        status_color = {
-            "Conectado": "green",
-            "Desconectado": "red",
-            "Aguardando": "yellow"
-        }.get(result["status"], "yellow")
-        
-        console.print(f"[bold]Status:[/bold] [{status_color}]{result['status']}[/{status_color}]")
-        console.print(f"[bold]Mensagem:[/bold] {result['message']}")
-    
-    console.print("\n[dim]Pressione Enter para voltar ao menu...[/dim]")
-    input()
+    # Implementação básica
+    console.print("[yellow]Função ainda não implementada completamente.[/yellow]")
+    input("\nPressione Enter para voltar...")
 
 
 def upload_certificates():
     """Envia certificados para o servidor remoto."""
-    console.clear()
-    console.print("[bold blue]== Envio de Certificados para o Servidor ==[/bold blue]\n")
-    
-    # Verificar se há um servidor configurado
-    if not connectivity_manager.config.get("server_url"):
-        console.print("[yellow]Nenhum servidor configurado. Configure um servidor primeiro.[/yellow]")
-        console.print("\n[dim]Pressione Enter para voltar ao menu...[/dim]")
-        input()
-        return
-    
-    # Verificar conexão antes de prosseguir
-    with console.status("[bold green]Verificando conexão..."):
-        conn_result = connectivity_manager.check_connection()
-    
-    if conn_result["status"] != "Conectado":
-        console.print(f"[red]Não foi possível conectar ao servidor: {conn_result['message']}[/red]")
-        console.print("[yellow]Verifique as configurações de conexão e tente novamente.[/yellow]")
-        console.print("\n[dim]Pressione Enter para voltar ao menu...[/dim]")
-        input()
-        return
-    
-    # Selecionar arquivos para envio
-    upload_dir = questionary.path(
-        "Selecione o diretório contendo os certificados a enviar:",
-        only_directories=True,
-        default=pdf_generator.output_dir
-    ).ask()
-    
-    if not upload_dir:
-        console.print("[yellow]Operação cancelada.[/yellow]")
-        console.print("\n[dim]Pressione Enter para voltar ao menu...[/dim]")
-        input()
-        return
-    
-    # Listar arquivos PDF no diretório
-    pdf_files = [os.path.join(upload_dir, f) for f in os.listdir(upload_dir) if f.lower().endswith('.pdf')]
-    
-    if not pdf_files:
-        console.print(f"[yellow]Nenhum arquivo PDF encontrado em: {upload_dir}[/yellow]")
-        console.print("\n[dim]Pressione Enter para voltar ao menu...[/dim]")
-        input()
-        return
-    
-    # Mostrar quantidade de arquivos encontrados
-    console.print(f"[bold]{len(pdf_files)} arquivos PDF encontrados.[/bold]")
-    
-    # Confirmar envio
-    confirm = questionary.confirm(f"Deseja enviar {len(pdf_files)} certificados para o servidor?").ask()
-    
-    if not confirm:
-        console.print("[yellow]Operação cancelada.[/yellow]")
-        console.print("\n[dim]Pressione Enter para voltar ao menu...[/dim]")
-        input()
-        return
-    
-    # Enviar arquivos
-    with console.status("[bold green]Enviando certificados para o servidor..."):
-        result = connectivity_manager.upload_certificates(pdf_files)
-    
-    if result["success"]:
-        console.print(f"[bold green]✓ {result['message']}[/bold green]")
-    else:
-        console.print(f"[bold red]Erro ao enviar certificados: {result['message']}[/bold red]")
-    
-    console.print("\n[dim]Pressione Enter para voltar ao menu...[/dim]")
-    input()
+    # Implementação básica
+    console.print("[yellow]Função ainda não implementada completamente.[/yellow]")
+    input("\nPressione Enter para voltar...")
 
 
 def download_templates():
     """Baixa templates do servidor remoto."""
-    console.clear()
-    console.print("[bold blue]== Download de Templates do Servidor ==[/bold blue]\n")
-    
-    # Verificar se há um servidor configurado
-    if not connectivity_manager.config.get("server_url"):
-        console.print("[yellow]Nenhum servidor configurado. Configure um servidor primeiro.[/yellow]")
-        console.print("\n[dim]Pressione Enter para voltar ao menu...[/dim]")
-        input()
-        return
-    
-    # Verificar conexão antes de prosseguir
-    with console.status("[bold green]Verificando conexão..."):
-        conn_result = connectivity_manager.check_connection()
-    
-    if conn_result["status"] != "Conectado":
-        console.print(f"[red]Não foi possível conectar ao servidor: {conn_result['message']}[/red]")
-        console.print("[yellow]Verifique as configurações de conexão e tente novamente.[/yellow]")
-        console.print("\n[dim]Pressione Enter para voltar ao menu...[/dim]")
-        input()
-        return
-    
-    # Obter lista de templates disponíveis
-    with console.status("[bold green]Consultando templates disponíveis..."):
-        result = connectivity_manager.download_templates()
-    
-    if not result["success"]:
-        console.print(f"[bold red]Erro ao consultar templates: {result['message']}[/bold red]")
-        console.print("\n[dim]Pressione Enter para voltar ao menu...[/dim]")
-        input()
-        return
-    
-    if not result["templates"]:
-        console.print("[yellow]Nenhum template disponível no servidor.[/yellow]")
-        console.print("\n[dim]Pressione Enter para voltar ao menu...[/dim]")
-        input()
-        return
-    
-    # Mostrar templates disponíveis
-    console.print(f"[bold]{len(result['templates'])} templates encontrados no servidor:[/bold]")
-    
-    table = Table(show_header=True, header_style="bold")
-    table.add_column("Nome", style="cyan")
-    table.add_column("Tamanho", justify="right")
-    table.add_column("Atualizado em")
-    
-    for template in result["templates"]:
-        table.add_row(
-            template["name"],
-            f"{template['size'] / 1024:.1f} KB",
-            template["updated_at"]
-        )
-    
-    console.print(table)
-    
-    # Opções de download
-    options = ["Baixar todos os templates"] + [f"Baixar '{t['name']}'" for t in result["templates"]] + ["Cancelar"]
-    
-    choice = questionary.select(
-        "O que você deseja fazer?",
-        choices=options
-    ).ask()
-    
-    if choice == "Cancelar":
-        console.print("[yellow]Operação cancelada.[/yellow]")
-        console.print("\n[dim]Pressione Enter para voltar ao menu...[/dim]")
-        input()
-        return
-    
-    # Simular download de templates
-    with console.status("[bold green]Baixando templates..."):
-        # Aqui seria feito o download real
-        import time
-        time.sleep(2)  # Simular tempo de download
-    
-    if choice == "Baixar todos os templates":
-        console.print(f"[bold green]✓ {len(result['templates'])} templates baixados com sucesso![/bold green]")
-    else:
-        console.print(f"[bold green]✓ Template baixado com sucesso![/bold green]")
-    
-    console.print("\n[dim]Pressione Enter para voltar ao menu...[/dim]")
-    input()
+    # Implementação básica
+    console.print("[yellow]Função ainda não implementada completamente.[/yellow]")
+    input("\nPressione Enter para voltar...")
 
 
 def configure_credentials():
     """Configura credenciais de acesso ao servidor."""
-    console.clear()
-    console.print("[bold blue]== Configuração de Credenciais ==[/bold blue]\n")
-    
-    # Obter configurações atuais
-    current_username = connectivity_manager.config.get("username", "")
-    has_password = bool(connectivity_manager.config.get("password", ""))
-    current_api_key = connectivity_manager.config.get("api_key", "")
-    
-    # Mostrar informações atuais
-    console.print("Configurações atuais:")
-    console.print(f"- Usuário: [cyan]{current_username or 'Não definido'}[/cyan]")
-    console.print(f"- Senha: [cyan]{'Configurada' if has_password else 'Não definida'}[/cyan]")
-    console.print(f"- Chave API: [cyan]{current_api_key or 'Não definida'}[/cyan]\n")
-    
-    # Opções de configuração
-    option = questionary.select(
-        "O que você deseja configurar?",
-        choices=[
-            "👤 Atualizar usuário e senha",
-            "🔑 Configurar chave API",
-            "↩️ Voltar ao menu"
-        ]
-    ).ask()
-    
-    if option == "👤 Atualizar usuário e senha":
-        username = questionary.text(
-            "Nome de usuário:",
-            default=current_username
-        ).ask()
-        
-        if username is None:  # Operação cancelada
-            console.print("[yellow]Operação cancelada.[/yellow]")
-        else:
-            password = questionary.password("Senha:").ask()
-            
-            if password is None:  # Operação cancelada
-                console.print("[yellow]Operação cancelada.[/yellow]")
-            else:
-                # Salvar credenciais
-                connectivity_manager.set_credentials(username, password)
-                console.print("[bold green]✓ Credenciais atualizadas com sucesso![/bold green]")
-    
-    elif option == "🔑 Configurar chave API":
-        api_key = questionary.password(
-            "Chave API:",
-            default=current_api_key
-        ).ask()
-        
-        if api_key is None:  # Operação cancelada
-            console.print("[yellow]Operação cancelada.[/yellow]")
-        else:
-            # Salvar chave API
-            connectivity_manager.set_api_key(api_key)
-            console.print("[bold green]✓ Chave API configurada com sucesso![/bold green]")
-    
-    console.print("\n[dim]Pressione Enter para voltar ao menu...[/dim]")
-    input()
+    # Implementação básica
+    console.print("[yellow]Função ainda não implementada completamente.[/yellow]")
+    input("\nPressione Enter para voltar...")
 
 
 # Função principal do aplicativo
