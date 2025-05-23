@@ -1,0 +1,10 @@
+{
+    "server_url": "https://teste.com",
+    "api_key": "",
+    "username": "",
+    "password": "",
+    "last_connection": "2025-05-22T23:55:08.701187",
+    "connection_status": "Conectado",
+    "auto_sync": false,
+    "sync_interval": 60
+}
