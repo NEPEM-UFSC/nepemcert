@@ -1,0 +1,63 @@
+{
+    "default_placeholders": {
+        "background_image": "https://example.com/background.jpg",
+        "title_text": "Certificado de Participação",
+        "title_font_size": "48px",
+        "title_color": "#2a6496",
+        "content_font_size": "24px",
+        "name_font_size": "36px",
+        "name_color": "#1a4971",
+        "intro_text": "Certificamos que",
+        "participation_text": "participou do evento",
+        "location_text": "realizado em",
+        "date_text": "nos dias",
+        "workload_text": "com carga horária total de",
+        "hours_text": "horas",
+        "coordinator_title": "Coordenador(a) do Evento",
+        "director_title": "Diretor(a) da Instituição",
+        "coordenador": "Nome do Coordenador",
+        "diretor": "Nome do Diretor",
+        "cidade": "Cidade",
+        "url_verificacao": "https://nepem.org/verificar-certificado/"
+    },
+    "theme_placeholders": {
+        "classic": {
+            "background_image": "https://example.com/backgrounds/classic.jpg",
+            "title_font_size": "48px",
+            "title_color": "#2a6496",
+            "content_font_size": "24px",
+            "name_font_size": "36px",
+            "name_color": "#1a4971"
+        },
+        "modern": {
+            "background_image": "https://example.com/backgrounds/modern.jpg",
+            "title_font_size": "42px",
+            "title_color": "#2c3e50",
+            "content_font_size": "22px",
+            "name_font_size": "34px",
+            "name_color": "#16a085"
+        },
+        "minimalist": {
+            "background_image": "https://example.com/backgrounds/minimalist.jpg",
+            "title_font_size": "46px",
+            "title_color": "#000000",
+            "content_font_size": "22px",
+            "name_font_size": "32px",
+            "name_color": "#333333"
+        },
+        "academic": {
+            "background_image": "https://example.com/backgrounds/academic.jpg",
+            "title_font_size": "50px",
+            "title_color": "#8B4513",
+            "content_font_size": "26px",
+            "name_font_size": "38px",
+            "name_color": "#654321"
+        }
+    },
+    "institutional_placeholders": {
+        "coordenador": "Prof. Dr. Tiago Olivoto",
+        "diretor": "Fulano da Silva",
+        "cidade": "Florianópolis, SC",
+        "url_verificacao": "https://nepemufsc.com/verificar-certificado/"
+    }
+}
