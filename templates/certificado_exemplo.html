@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Certificado de Participação</title>
+    <style>
+        @page {
+            size: A4 landscape;
+            margin: 0;
+        }
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Arial', sans-serif;
+            width: 100%;
+            height: 100%;
+        }
+        .certificate {
+            width: 297mm;
+            height: 210mm;
+            background-color: #fff;
+            background-image: url('{{ background_image }}');
+            background-size: cover;
+            padding: 20mm;
+            box-sizing: border-box;
+            position: relative;
+            color: #333;
+            text-align: center;
+        }
+        .header {
+            margin-bottom: 15mm;
+        }
+        .logo {
+            max-width: 150px;
+            margin-bottom: 10mm;
+        }
+        .title {
+            font-size: {{ title_font_size|default('48px') }};
+            font-weight: bold;
+            color: {{ title_color|default('#2a6496') }};
+            margin-bottom: 20mm;
+            text-transform: uppercase;
+        }
+        .content {
+            font-size: {{ content_font_size|default('24px') }};
+            line-height: 1.5;
+            margin-bottom: 25mm;
+        }
+        .name {
+            font-size: {{ name_font_size|default('36px') }};
+            font-weight: bold;
+            color: {{ name_color|default('#1a4971') }};
+            margin: 10mm 0;
+            border-bottom: 2px solid #1a4971;
+            display: inline-block;
+            padding: 0 20mm 5mm;
+        }
+        .footer {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 15mm;
+        }
+        .signature {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .signature-line {
+            width: 60mm;
+            border-top: 1px solid #333;
+            margin-bottom: 5mm;
+        }
+        .signature-name {
+            font-weight: bold;
+        }
+        .date {
+            font-size: 18px;
+            margin-top: 10mm;
+        }
+        .verification {
+            position: absolute;
+            bottom: 10mm;
+            left: 20mm;
+            font-size: 12px;
+            text-align: left;
+            color: #666;
+        }
+        .verification-code {
+            font-weight: bold;
+            font-family: monospace;
+            color: #1a4971;
+            margin: 2mm 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="certificate">
+        <div class="header">
+            <h1 class="title">{{ title_text|default('Certificado de Participação') }}</h1>
+        </div>
+        
+        <div class="content">
+            {{ intro_text|default('Certificamos que') }}
+            <div class="name">{{ nome }}</div>
+            {{ participation_text|default('participou do evento') }} <strong>{{ evento }}</strong>, 
+            {{ location_text|default('realizado em') }} {{ local }} {{ date_text|default('nos dias') }} {{ data }}, 
+            {{ workload_text|default('com carga horária total de') }} <strong>{{ carga_horaria }} {{ hours_text|default('horas') }}</strong>.
+        </div>
+        
+        <div class="footer">
+            <div class="signature">
+                <div class="signature-line"></div>
+                <div class="signature-name">{{ coordenador }}</div>
+                <div>{{ coordinator_title|default('Coordenador(a) do Evento') }}</div>
+            </div>
+            
+            <div class="signature">
+                <div class="signature-line"></div>
+                <div class="signature-name">{{ diretor }}</div>
+                <div>{{ director_title|default('Diretor(a) da Instituição') }}</div>
+            </div>
+        </div>
+        
+        <div class="date">
+            {{ cidade }}, {{ data_emissao }}
+        </div>
+
+        <div class="verification">
+            <div class="verification-code">Código de Verificação: {{ codigo_verificacao }}</div>
+            A autenticidade deste certificado pode ser verificada em:<br>
+            {{ url_verificacao }}
+        </div>
+    </div>
+</body>
+</html>
