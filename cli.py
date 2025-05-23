@@ -79,12 +79,13 @@ def print_header():
         Layout(name="connection")
     )
     
-    # Conteúdo das caixas
+    # Conteúdo das caixas - limitando a 3 linhas
     layout["version"].update(
         Panel(
-            f"[bold]Versão:[/bold] {APP_VERSION}",
+            Text(f"[bold]Versão:[/bold] {APP_VERSION}"),
             title="Informações do Sistema",
-            border_style="green"
+            border_style="green",
+            height=3
         )
     )
     
@@ -97,9 +98,10 @@ def print_header():
     
     layout["connection"].update(
         Panel(
-            f"[bold]Status:[/bold] [{status_color}]{connection_status}[/{status_color}]",
+            Text(f"[bold]Status:[/bold] [{status_color}]{connection_status}[/{status_color}]"),
             title="Conexão com Servidor",
-            border_style=status_color
+            border_style=status_color,
+            height=3
         )
     )
     
@@ -123,11 +125,7 @@ def main_menu():
             "🚪 Sair"
         ],
         use_indicator=True,
-        style=questionary.Style([
-            ('selected', 'bg:#0A1128 #ffffff'),
-            ('instruction', 'fg:#0A1128'),
-            ('pointer', 'fg:#0A1128'),
-        ])
+        style=get_menu_style()
     ).ask()
     
     if choice == "🔖 Gerar Certificados":
@@ -150,7 +148,7 @@ def main_menu():
 def generate_certificates_menu():
     """Menu para geração de certificados."""
     console.clear()
-    console.print("[bold blue]== Geração de Certificados ==[/bold blue]\n")
+    console.print("[bold blue]== Geração de Certificados em Lote ==[/bold blue]\n")
     
     choice = questionary.select(
         "O que você deseja fazer?",
@@ -159,7 +157,8 @@ def generate_certificates_menu():
             "📋 Visualizar dados importados",
             "🔍 Testar geração com um único registro",
             "↩️ Voltar ao menu principal"
-        ]
+        ],
+        style=get_menu_style()
     ).ask()
     
     if choice == "📄 Gerar certificados em lote":
@@ -186,7 +185,8 @@ def manage_templates_menu():
             "🗑️ Excluir template",
             "👁️ Visualizar template",
             "↩️ Voltar ao menu principal"
-        ]
+        ],
+        style=get_menu_style()
     ).ask()
     
     if choice == "📝 Listar templates disponíveis":
@@ -216,7 +216,8 @@ def settings_menu():
             "📊 Parâmetros de geração",
             "💾 Salvar/carregar presets",
             "↩️ Voltar ao menu principal"
-        ]
+        ],
+        style=get_menu_style()
     ).ask()
     
     if choice == "📁 Diretórios de trabalho":
@@ -245,7 +246,8 @@ def connectivity_menu():
             "⬇️ Baixar templates do servidor",
             "🔒 Configurar credenciais",
             "↩️ Voltar ao menu principal"
-        ]
+        ],
+        style=get_menu_style()
     ).ask()
     
     if choice == "🔄 Verificar status da conexão":
@@ -302,6 +304,17 @@ def show_help():
     console.print(md)
     console.print("\n[dim]Pressione Enter para voltar ao menu principal...[/dim]")
     input()
+
+
+def get_menu_style():
+    """Retorna o estilo padrão para menus de questionary."""
+    return questionary.Style([
+        ('selected', 'bg:#0066cc #ffffff bold'),
+        ('highlighted', 'fg:#0066cc bold'),
+        ('instruction', 'fg:#0A1128'),
+        ('pointer', 'fg:#0066cc bold'),
+        ('answer', 'fg:#0066cc bold'),
+    ])
 
 
 # Função de geração de certificados implementada conforme o fluxo solicitado
@@ -381,7 +394,8 @@ def generate_batch_certificates():
                 "Modificar local",
                 "Modificar carga horária",
                 "Cancelar operação"
-            ]
+            ],
+            style=get_menu_style()
         ).ask()
         
         if choice == "Não, continuar":
@@ -403,10 +417,10 @@ def generate_batch_certificates():
     if not templates:
         console.print("[yellow]Nenhum template disponível. Por favor, importe um template primeiro.[/yellow]")
         return
-    
     template_name = questionary.select(
         "Selecione o template a ser utilizado:",
-        choices=templates
+        choices=templates,
+        style=get_menu_style()
     ).ask()
     
     if not template_name:
@@ -417,7 +431,8 @@ def generate_batch_certificates():
     themes = ["Nenhum"] + theme_manager.list_themes()
     selected_theme = questionary.select(
         "Selecione um tema para os certificados:",
-        choices=themes
+        choices=themes,
+        style=get_menu_style()
     ).ask()
     
     theme = None if selected_theme == "Nenhum" else selected_theme
@@ -665,10 +680,10 @@ def test_certificate_generation():
         console.print("[yellow]Nenhum template disponível. Por favor, importe um template primeiro.[/yellow]")
         input("\nPressione Enter para voltar...")
         return
-        
     template_name = questionary.select(
         "Selecione o template a ser utilizado:",
-        choices=templates
+        choices=templates,
+        style=get_menu_style()
     ).ask()
     
     if not template_name:
@@ -847,10 +862,11 @@ def edit_template():
         input("\nPressione Enter para voltar...")
         return
     
-    # Selecionar template para editar
+    # Selecionar template para editar    
     template_name = questionary.select(
         "Selecione o template para editar:",
-        choices=templates
+        choices=templates,
+        style=get_menu_style()
     ).ask()
     
     if not template_name:
@@ -908,10 +924,11 @@ def delete_template():
         input("\nPressione Enter para voltar...")
         return
     
-    # Selecionar template para excluir
+    # Selecionar template para excluir    
     template_name = questionary.select(
         "Selecione o template para excluir:",
-        choices=templates
+        choices=templates,
+        style=get_menu_style()
     ).ask()
     
     if not template_name:
@@ -952,10 +969,11 @@ def preview_template():
         input("\nPressione Enter para voltar...")
         return
     
-    # Selecionar template para visualizar
+    # Selecionar template para visualizar    
     template_name = questionary.select(
         "Selecione o template para visualizar:",
-        choices=templates
+        choices=templates,
+        style=get_menu_style()
     ).ask()
     
     if not template_name:
@@ -1066,7 +1084,8 @@ def configure_generation_parameters():
             "🔤 Valores padrão para campos",
             "🖼️ Valores específicos para temas",
             "↩️ Voltar"
-        ]
+        ],
+        style=get_menu_style()
     ).ask()
     
     if choice == "📝 Valores para campos institucionais":
@@ -1108,7 +1127,8 @@ def configure_institutional_placeholders():
             "➕ Adicionar/editar campo",
             "🗑️ Remover campo",
             "↩️ Voltar"
-        ]
+        ],
+        style=get_menu_style()
     ).ask()
     
     if choice == "➕ Adicionar/editar campo":
@@ -1128,10 +1148,10 @@ def configure_institutional_placeholders():
             input("\nPressione Enter para voltar...")
             configure_institutional_placeholders()
             return
-            
         field_to_remove = questionary.select(
             "Selecione o campo para remover:",
-            choices=list(institutional.keys()) + ["Cancelar"]
+            choices=list(institutional.keys()) + ["Cancelar"],
+            style=get_menu_style()
         ).ask()
         
         if field_to_remove and field_to_remove != "Cancelar":
