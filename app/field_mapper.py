@@ -18,6 +18,13 @@ class FieldMapper:
         
         return template_data
     
+    def get_columns(self, dataframe):
+        """
+        Extrai as colunas de um DataFrame.
+        Retorna uma lista com os nomes das colunas.
+        """
+        return list(dataframe.columns)
+    
     def validate_mapping(self, csv_columns, template_placeholders):
         """
         Valida se todos os placeholders do template existem nas colunas do CSV.
