@@ -168,3 +168,15 @@ cython_debug/
 
 .cursorignore
 .cursorindexingignore
+
+# Copilot stuff
+
+.copilot/
+.github/instructions
+copilot-instructions.md
+
+# Output
+
+output/
+
+uploads/
