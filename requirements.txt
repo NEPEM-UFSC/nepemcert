@@ -1,5 +1,5 @@
 # filepath: c:\Users\mathe\OneDrive\Documentos\GitHub\nepemcert\requirements.txt
-click==8.2.1
+click==8.1.8
 typer==0.15.4
 rich==14.0.0
 questionary==2.1.0
