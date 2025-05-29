@@ -20,7 +20,7 @@ O projeto segue uma arquitetura modular, com separação clara de responsabilida
    - Renderiza templates com dados
 
 3. **Gerenciador de PDF (`app/pdf_generator.py`)**
-   - Converte HTML em PDF usando xhtml2pdf
+   - Converte HTML em PDF usando WeasyPrint
    - Gerencia a geração de múltiplos certificados em lote
 
 4. **Gerenciador de Parâmetros (`app/parameter_manager.py`)**
@@ -218,8 +218,9 @@ Contém valores padrão para placeholders:
    - Verifique se os placeholders estão no formato correto: `{{ placeholder }}`
 
 2. **Erros de renderização PDF**:
-   - O xhtml2pdf tem limitações com certas funcionalidades CSS
-   - Evite elementos como flexbox, posicionamento absoluto, etc.
+   - O WeasyPrint oferece melhor suporte a CSS moderno comparado ao xhtml2pdf
+   - Suporta flexbox, grid, posicionamento absoluto e outras funcionalidades CSS3
+   - Recomenda-se usar CSS padrão para melhor compatibilidade
 
 3. **Problemas com caracteres especiais**:
    - Certifique-se de que os arquivos CSV estão codificados em UTF-8
