@@ -112,11 +112,20 @@
         .verification-info {
             margin-bottom: 10px;
         }
-        
-        .emission-info {
+          .emission-info {
             font-size: 9px;
             color: #888;
             font-style: italic;
+        }
+        
+        .nepemcert-link {
+            color: #1a5276;
+            text-decoration: none;
+            font-weight: bold;
+        }
+        
+        .nepemcert-link:hover {
+            text-decoration: underline;
         }
           .qr-placeholder {
             position: absolute;
@@ -182,9 +191,8 @@
             <div class="verification-info">
                 A autenticidade deste certificado pode ser verificada em: <strong>{{ url_verificacao }}</strong> 
                 com o código <strong>{{ codigo_verificacao }}</strong>.
-            </div>
-            <div class="emission-info">
-                Este certificado foi emitido em {{ cidade }}, {{ data_emissao }}, utilizando NEPEMCERT.
+            </div>            <div class="emission-info">
+                Este certificado foi emitido em {{ cidade }}, {{ data_emissao }}, utilizando <a href="https://www.github.com/NEPEM-UFSC/nepemcert" class="nepemcert-link" target="_blank" rel="noopener">NEPEMCERT</a>.
             </div>
         </div>
     </div>
