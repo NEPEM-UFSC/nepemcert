@@ -128,9 +128,8 @@ class TemplateManager:
             "extra_docs": extra_docs,
             "valid": len(missing_docs) == 0
         }
-    
-    def validate_template_for_xhtml2pdf(self, template_content):
-        """Valida se um template contém elementos problemáticos para o xhtml2pdf"""
+    def validate_template_for_weasyprint(self, template_content):
+        """Valida se um template está adequado para renderização com WeasyPrint"""
         return self.validate_template(template_content)
     
     def validate_placeholders_against_csv(self, placeholders, csv_columns):

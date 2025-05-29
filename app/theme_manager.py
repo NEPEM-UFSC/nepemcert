@@ -225,7 +225,7 @@ class ThemeManager:
         footer_style = theme_settings.get("footer_style", "classic")
         
         # Garantir que apenas fontes seguras sejam usadas (evita importação de fontes da web)
-        # xhtml2pdf tem limitações com fontes importadas via CSS
+        # WeasyPrint tem melhor suporte a fontes importadas via CSS
         safe_fonts = {
             "'Crimson Text', 'Garamond', 'Times New Roman', serif": "Times, Times New Roman, serif",
             "'Cormorant Garamond', 'Palatino Linotype', 'Book Antiqua', serif": "Palatino, Times New Roman, serif",
