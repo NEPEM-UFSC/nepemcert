@@ -8,6 +8,7 @@ Aplicativo para geração de certificados em lote via CLI.
 import os
 import sys
 import click
+import pandas as pd
 from rich.console import Console
 
 # Importar o módulo CLI melhorado
