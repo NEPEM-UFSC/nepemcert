@@ -62,7 +62,6 @@ class ParameterManager:
         
         self.parameters["institutional_placeholders"].update(new_values)
         self.save_parameters()
-    
     def merge_placeholders(self, csv_data=None, theme=None):
         """
         Combina diferentes fontes de placeholders na seguinte ordem de prioridade:
@@ -79,7 +78,29 @@ class ParameterManager:
         
         # Adicionar placeholders do tema, se especificado
         if theme:
-            merged.update(self.get_theme_placeholders(theme))
+            # Carregar placeholders específicos do tema
+            theme_placeholders = self.get_theme_placeholders(theme)
+            merged.update(theme_placeholders)
+            
+            # Verificar se precisamos carregar configurações adicionais do ThemeManager
+            from app.theme_manager import ThemeManager
+            theme_manager = ThemeManager()
+            theme_settings = theme_manager.load_theme(theme)
+            
+            if theme_settings:
+                # Extrair propriedades do tema que também são placeholders
+                theme_placeholder_props = [
+                    "title_text", "intro_text", "participation_text",
+                    "location_text", "date_text", "workload_text",
+                    "hours_text", "coordinator_title", "director_title",
+                    "title_font_size", "title_color", "content_font_size",
+                    "name_font_size", "name_color"
+                ]
+                
+                # Atualizar merged com propriedades do tema que são placeholders
+                for prop in theme_placeholder_props:
+                    if prop in theme_settings and prop not in merged:
+                        merged[prop] = theme_settings[prop]
         
         # Adicionar dados do CSV, se fornecidos (maior prioridade)
         if csv_data:
