@@ -18,6 +18,47 @@ Um aplicativo interno para geração de certificados em lote de participação d
 - Python 3.10 ou superior
 - Dependências listadas em requirements.txt
 
+### Instalação no Windows
+
+Este projeto utiliza **WeasyPrint** para geração de PDFs, que requer algumas dependências específicas no Windows:
+
+#### 1. Instale o GTK3 Runtime
+WeasyPrint depende do GTK3. Para Windows, baixe e instale:
+- [GTK3 Runtime for Windows](https://github.com/tschoonj/GTK-for-Windows-Runtime-Environment-Installer/releases)
+- Baixe a versão mais recente do instalador (.exe)
+- Execute como administrador e siga as instruções de instalação
+
+#### 2. Instale as dependências Python
+Após instalar o GTK3, instale as dependências do projeto:
+
+```powershell
+# Ative seu ambiente conda (se estiver usando)
+conda activate nepemcert
+
+# Instale as dependências
+pip install -r requirements.txt
+```
+
+#### 3. Verificação da Instalação
+Para verificar se o WeasyPrint foi instalado corretamente:
+
+```powershell
+python -c "import weasyprint; print('WeasyPrint instalado com sucesso!')"
+```
+
+#### Solução de Problemas - Windows
+
+Se encontrar erros durante a instalação:
+
+1. **Erro de DLL não encontrada**: Certifique-se de que o GTK3 Runtime foi instalado corretamente
+2. **Erro de compilação**: Instale as ferramentas de build do Visual Studio:
+   ```powershell
+   # Instale as Build Tools for Visual Studio
+   # Ou instale via chocolatey:
+   choco install visualstudio2022buildtools
+   ```
+3. **Erro de fontes**: O WeasyPrint pode precisar de fontes específicas. Instale fontes comuns do sistema
+
 ## Uso
 
 ### Interface Interativa
