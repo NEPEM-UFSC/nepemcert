@@ -17,11 +17,14 @@ from cli import main as cli_main
 console = Console()
 
 
-@click.group()
+@click.group(invoke_without_command=True)
+@click.pass_context
 @click.version_option(version="1.1.0", prog_name="NEPEM Certificados")
-def cli():
+def cli(ctx):
     """NEPEM Certificados - Gerador de certificados em lote via linha de comando."""
-    pass
+    # Se nenhum comando foi especificado, executa o modo interativo
+    if ctx.invoked_subcommand is None:
+        cli_main()
 
 
 @cli.command()
@@ -201,4 +204,11 @@ def server(status, url):
 
 
 if __name__ == "__main__":
-    cli()
+    # Verificar se o usuário quer ajuda específica
+    help_args = ["--help", "-h", "h", "help"]
+    if len(sys.argv) > 1 and any(arg in sys.argv for arg in help_args):
+        # Exibir ajuda normal do Click
+        cli(["--help"])
+    else:
+        # Se não for solicitação de ajuda, executar normalmente
+        cli()

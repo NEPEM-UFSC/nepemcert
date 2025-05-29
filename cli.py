@@ -568,8 +568,8 @@ def generate_batch_certificates():
     # Gerar PDFs em lote
     console.print("\n[bold]Gerando arquivos PDF...[/bold]")
     
-    try:
-        generated_paths = pdf_generator.batch_generate(html_contents, file_names)
+    try:        
+        generated_paths = pdf_generator.batch_generate(html_contents, file_names, orientation='landscape')
         console.print(f"[bold green]✓ {len(generated_paths)} certificados gerados com sucesso![/bold green]")
         
         # Oferecer opção para criar ZIP
@@ -716,9 +716,8 @@ def test_certificate_generation():
                 
                 # Renderizar o template com os dados
                 html_content = template_manager.render_template(temp_name, test_data)
-                
-                # Gerar PDF
-                pdf_generator.generate_pdf(html_content, output_path)
+                  # Gerar PDF
+                pdf_generator.generate_pdf(html_content, output_path, orientation='landscape')
             finally:
                 # Limpar arquivo temporário
                 if os.path.exists(temp_path):
@@ -1014,9 +1013,8 @@ def preview_template():
                     
                     # Renderizar com dados de exemplo
                     html_content = template_manager.render_template(temp_name, example_data)
-                    
-                    # Gerar PDF
-                    pdf_generator.generate_pdf(html_content, preview_path)
+                      # Gerar PDF
+                    pdf_generator.generate_pdf(html_content, preview_path, orientation='landscape')
                 finally:
                     # Limpar arquivo temporário
                     if os.path.exists(temp_path):
