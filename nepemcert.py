@@ -204,6 +204,155 @@ def server(status, url):
         console.print("[cyan]Use o modo interativo para gerenciar a conectividade:[/cyan] nepemcert interactive")
 
 
+@cli.command()
+@click.argument("template", type=click.Path(exists=True))
+@click.option("--output", "-o", default=None, help="Diretório de saída para os certificados (padrão: output/debug_themes_TIMESTAMP)")
+@click.option("--zip", "-z", is_flag=True, help="Criar arquivo ZIP com todos os certificados")
+def debug_themes(template, output, zip):
+    """
+    [DEBUG] Gera certificados com TODOS os temas usando dados de exemplo.
+    
+    TEMPLATE: Caminho para o arquivo de template HTML.
+    
+    Esta é uma ferramenta de debug que gera um certificado para cada tema disponível
+    usando dados de exemplo fixos. Útil para comparar visualmente todos os temas.
+    """
+    import pandas as pd
+    from datetime import datetime
+    from app.pdf_generator import PDFGenerator
+    from app.zip_exporter import ZipExporter
+    from app.parameter_manager import ParameterManager
+    from app.template_manager import TemplateManager
+    from app.theme_manager import ThemeManager
+    
+    console.print(f"[bold blue]🐛 DEBUG: Gerando certificados com todos os temas...[/bold blue]")
+    console.print(f"- Template: [cyan]{template}[/cyan]")
+    
+    try:
+        # Criar diretório de saída
+        if not output:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            output = os.path.join("output", f"debug_themes_{timestamp}")
+        
+        os.makedirs(output, exist_ok=True)
+        console.print(f"- Diretório de saída: [cyan]{output}[/cyan]")
+        
+        # Carregar template
+        with open(template, 'r', encoding='utf-8') as f:
+            template_content = f.read()
+        console.print(f"[green]✓[/green] Template carregado")
+        
+        # Inicializar geradores
+        pdf_generator = PDFGenerator(output_dir=output)
+        zip_exporter = ZipExporter()
+        parameter_manager = ParameterManager()
+        template_manager_obj = TemplateManager()
+        theme_manager = ThemeManager()
+        
+        # Dados de exemplo fixos
+        sample_data = {
+            "nome": "Maria Clara Desenvolvimento",
+            "evento": "Curso Avançado de Desenvolvimento de Software",
+            "local": "Centro de Tecnologia e Inovação - Auditório Principal",
+            "data": "22 a 24 de maio de 2025",
+            "carga_horaria": "24",
+            "coordenador": "Prof. Dr. Ana Carolina Fernandes",
+            "diretor": "Prof. Dr. Carlos Eduardo Martins",
+            "cidade": "São Paulo",
+            "data_emissao": "29 de maio de 2025",
+            "codigo_verificacao": "DEBUG-CMD-2025-001",
+            "url_verificacao": "https://certificados.debug.local",
+            "intro_text": "Certificamos que",
+            "participation_text": "participou com êxito do",
+            "location_text": "realizado em",
+            "date_text": "no período de",
+            "workload_text": "com carga horária total de",
+            "hours_text": "horas",
+            "coordinator_title": "Coordenador do Programa",
+            "director_title": "Diretor Acadêmico",
+            "title_text": "CERTIFICADO DE PARTICIPAÇÃO"
+        }
+        
+        # Listar temas disponíveis
+        available_themes = theme_manager.list_themes()
+        
+        if not available_themes:
+            console.print("[red]❌ Nenhum tema disponível.[/red]")
+            sys.exit(1)
+        
+        console.print(f"[green]✓[/green] Temas encontrados: {len(available_themes)}")
+        console.print(f"[cyan]Temas: {', '.join(available_themes)}[/cyan]")
+        
+        # Gerar certificados
+        generated_files = []
+        
+        with console.status("[bold green]Gerando certificados...") as status:
+            for i, theme_name in enumerate(available_themes, 1):
+                try:
+                    status.update(f"[bold green]Processando tema {i}/{len(available_themes)}: {theme_name}")
+                    
+                    # Carregar configurações do tema
+                    theme_settings = theme_manager.load_theme(theme_name)
+                    
+                    # Mesclar dados com configurações do tema
+                    merged_data = parameter_manager.merge_placeholders(sample_data.copy(), theme_name)
+                    
+                    # Criar nome temporário para o template
+                    base_name = os.path.basename(template)
+                    temp_name = f"temp_debug_{theme_name.replace(' ', '_').lower()}_{i}.html"
+                    temp_path = os.path.join("templates", temp_name)
+                    
+                    try:
+                        # Salvar template temporariamente
+                        with open(temp_path, "w", encoding="utf-8") as f:
+                            f.write(template_content)
+                        
+                        # Renderizar template
+                        html_content = template_manager_obj.render_template(temp_name, merged_data)
+                        
+                        # Aplicar tema se disponível
+                        if theme_settings:
+                            html_content = theme_manager.apply_theme_to_template(html_content, theme_settings)
+                        
+                        # Gerar nome do arquivo PDF
+                        safe_theme_name = theme_name.replace(" ", "_").replace("ã", "a").replace("é", "e").replace("ô", "o")
+                        pdf_filename = f"certificado_tema_{safe_theme_name}.pdf"
+                        pdf_path = os.path.join(output, pdf_filename)
+                        
+                        # Gerar PDF
+                        pdf_generator.generate_pdf(html_content, pdf_path, orientation='landscape')
+                        generated_files.append(pdf_path)
+                        
+                        console.print(f"[green]✓[/green] {theme_name} → {pdf_filename}")
+                        
+                    finally:
+                        # Limpar arquivo temporário
+                        if os.path.exists(temp_path):
+                            os.remove(temp_path)
+                            
+                except Exception as e:
+                    console.print(f"[red]❌ Erro no tema '{theme_name}': {str(e)}[/red]")
+        
+        # Relatório final
+        console.print(f"\n[bold green]🎉 Geração concluída![/bold green]")
+        console.print(f"[green]✓ {len(generated_files)} certificados gerados[/green]")
+        
+        # Criar arquivo ZIP se solicitado
+        if zip and generated_files:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            zip_name = f"debug_temas_{timestamp}.zip"
+            zip_path = os.path.join(output, zip_name)
+            
+            with console.status("[bold green]Criando arquivo ZIP..."):
+                zip_exporter.create_zip(generated_files, zip_path)
+            
+            console.print(f"[bold green]✓ Arquivo ZIP criado: [/bold green]{zip_name}")
+    
+    except Exception as e:
+        console.print(f"[bold red]Erro ao executar debug de temas: [/bold red]{str(e)}")
+        sys.exit(1)
+
+
 if __name__ == "__main__":
     # Verificar se o usuário quer ajuda específica
     help_args = ["--help", "-h", "h", "help"]
