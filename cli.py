@@ -112,6 +112,7 @@ from app.zip_exporter import ZipExporter
 from app.connectivity_manager import ConnectivityManager
 from app.parameter_manager import ParameterManager
 from app.theme_manager import ThemeManager
+from app.authentication_manager import AuthenticationManager
 
 # Configuração do console Rich
 console = Console()
@@ -128,6 +129,7 @@ zip_exporter = ZipExporter()
 connectivity_manager = ConnectivityManager()
 parameter_manager = ParameterManager()
 theme_manager = ThemeManager()
+auth_manager = AuthenticationManager()
 
 
 def check_connection_status():
@@ -214,13 +216,13 @@ def generate_certificates_menu():
     """Menu para geração de certificados."""
     console.clear()
     console.print("[bold blue]== Geração de Certificados em Lote ==[/bold blue]\n")
-    
     choice = quiet_select(
         "O que você deseja fazer?",
         choices=[
             "📄 Gerar certificados em lote",
             "📋 Visualizar dados importados",
             "🔍 Testar geração com um único registro",
+            "🔐 Verificar código de autenticação",
             "↩️ Voltar ao menu principal"
         ],
         style=get_menu_style()
@@ -232,6 +234,8 @@ def generate_certificates_menu():
         preview_imported_data()
     elif choice == "🔍 Testar geração com um único registro":
         test_certificate_generation()
+    elif choice == "🔐 Verificar código de autenticação":
+        verify_authentication_code()
     elif choice == "↩️ Voltar ao menu principal":
         return
 
@@ -599,13 +603,36 @@ def generate_batch_certificates():
         
         for index, row in df.iterrows():
             progress.update(task, description=f"[green]Processando certificado {index+1}/{num_records}...")
-            
-            # Combinar dados do participante com as informações comuns
+              # Combinar dados do participante com as informações comuns
             participante_data = {"nome": row["nome"]}
             
-            # Gerar código de verificação único
-            codigo = f"CERT-{participante_data['nome'].strip()[0:2].upper()}-{datetime.now().strftime('%Y')}-{index+1:03d}"
-            participante_data["codigo_verificacao"] = codigo
+            # Gerar código de autenticação único usando nosso gerenciador
+            codigo_autenticacao = auth_manager.gerar_codigo_autenticacao(
+                nome_participante=participante_data['nome'],
+                evento=evento,
+                data_evento=data
+            )
+            
+            # Gerar código de verificação mais curto para exibição
+            codigo_verificacao = auth_manager.gerar_codigo_verificacao(codigo_autenticacao)
+            
+            # Salvar informações do certificado
+            auth_manager.salvar_codigo(
+                codigo_autenticacao=codigo_autenticacao,
+                nome_participante=participante_data['nome'],
+                evento=evento,
+                data_evento=data,
+                local_evento=local,
+                carga_horaria=carga_horaria
+            )
+            
+            # Gerar URL para QR Code (se aplicável)
+            qrcode_url = auth_manager.gerar_qrcode_data(codigo_autenticacao)
+            
+            # Adicionar códigos aos dados do participante
+            participante_data["codigo_autenticacao"] = codigo_autenticacao
+            participante_data["codigo_verificacao"] = codigo_verificacao
+            participante_data["url_verificacao"] = qrcode_url
             
             # Adicionar data de emissão
             participante_data["data_emissao"] = datetime.now().strftime("%d/%m/%Y")
@@ -768,12 +795,50 @@ def test_certificate_generation():
         console.print("[yellow]Aviso: Não foram encontrados placeholders no template.[/yellow]")
         input("\nPressione Enter para voltar...")
         return
-    
-    # Solicitar valores para os placeholders
+      # Solicitar valores para os placeholders
     test_data = {}
     console.print("[bold]Informe os valores para os campos:[/bold]\n")
     
-    for placeholder in placeholders:
+    # Solicitar informações principais primeiro
+    nome = quiet_text("Nome do participante:")
+    evento = quiet_text("Nome do evento:")
+    data = quiet_text("Data do evento (ex: 15/05/2025):", default=datetime.now().strftime("%d/%m/%Y"))
+    local = quiet_text("Local do evento:")
+    carga_horaria = quiet_text("Carga horária (horas):")
+    
+    # Gerar código de autenticação para o teste
+    codigo_autenticacao = auth_manager.gerar_codigo_autenticacao(
+        nome_participante=nome,
+        evento=evento,
+        data_evento=data
+    )
+    codigo_verificacao = auth_manager.gerar_codigo_verificacao(codigo_autenticacao)
+    qrcode_url = auth_manager.gerar_qrcode_data(codigo_autenticacao)
+    
+    # Salvar informações do certificado de teste
+    auth_manager.salvar_codigo(
+        codigo_autenticacao=codigo_autenticacao,
+        nome_participante=nome,
+        evento=evento,
+        data_evento=data,
+        local_evento=local,
+        carga_horaria=carga_horaria
+    )
+    
+    # Adicionar valores principais e códigos ao dicionário de dados
+    test_data["nome"] = nome
+    test_data["evento"] = evento
+    test_data["data"] = data
+    test_data["local"] = local
+    test_data["carga_horaria"] = carga_horaria
+    test_data["codigo_autenticacao"] = codigo_autenticacao
+    test_data["codigo_verificacao"] = codigo_verificacao
+    test_data["url_verificacao"] = qrcode_url
+    test_data["data_emissao"] = datetime.now().strftime("%d/%m/%Y")
+    
+    # Solicitar valores para os demais placeholders que não foram preenchidos
+    outros_placeholders = [p for p in placeholders if p not in test_data]
+    for placeholder in outros_placeholders:
         value = quiet_text(f"Valor para '{placeholder}':")
         test_data[placeholder] = value
     
@@ -1358,20 +1423,34 @@ def debug_compare_themes():
     if not template_content:
         console.print(f"[red]❌ Erro ao carregar template: {template_name}[/red]")
         return
+      # Gerar código de autenticação para exemplos de temas
+    nome_exemplo = "João da Silva Santos"
+    evento_exemplo = "Workshop de Tecnologia e Inovação"
+    data_exemplo = "15 a 17 de maio de 2025"
+    
+    # Gerar código de autenticação para o exemplo
+    codigo_autenticacao_exemplo = auth_manager.gerar_codigo_autenticacao(
+        nome_participante=nome_exemplo,
+        evento=evento_exemplo,
+        data_evento=data_exemplo
+    )
+    codigo_verificacao_exemplo = auth_manager.gerar_codigo_verificacao(codigo_autenticacao_exemplo)
+    qrcode_url_exemplo = auth_manager.gerar_qrcode_data(codigo_autenticacao_exemplo)
     
     # Dados de exemplo fixos para todos os certificados
     sample_data = {
-        "nome": "João da Silva Santos",
-        "evento": "Workshop de Tecnologia e Inovação",
+        "nome": nome_exemplo,
+        "evento": evento_exemplo,
         "local": "Campus Universitário - Sala de Conferências",
-        "data": "15 a 17 de maio de 2025",
+        "data": data_exemplo,
         "carga_horaria": "20",
         "coordenador": "Prof. Dr. Maria Fernanda Costa",
         "diretor": "Prof. Dr. Roberto Andrade Lima",
         "cidade": "Florianópolis",
         "data_emissao": "29 de maio de 2025",
-        "codigo_verificacao": "DEBUG-2025-001",
-        "url_verificacao": "https://certificados.exemplo.com.br",
+        "codigo_autenticacao": codigo_autenticacao_exemplo,
+        "codigo_verificacao": codigo_verificacao_exemplo,
+        "url_verificacao": qrcode_url_exemplo,
         "intro_text": "Certificamos que",
         "participation_text": "participou com êxito do",
         "location_text": "realizado em",
@@ -1382,6 +1461,16 @@ def debug_compare_themes():
         "director_title": "Diretor da Instituição",
         "title_text": "CERTIFICADO DE PARTICIPAÇÃO"
     }
+    
+    # Salvar informações do certificado de exemplo
+    auth_manager.salvar_codigo(
+        codigo_autenticacao=codigo_autenticacao_exemplo,
+        nome_participante=nome_exemplo,
+        evento=evento_exemplo,
+        data_evento=data_exemplo,
+        local_evento=sample_data["local"],
+        carga_horaria=sample_data["carga_horaria"]
+    )
     
     # Listar temas disponíveis
     available_themes = theme_manager.list_themes()
@@ -1529,6 +1618,80 @@ def debug_compare_themes():
                     except:
                         subprocess.call(["xdg-open", first_pdf])  # Linux
                 console.print("[green]✓ Certificado aberto[/green]")
+    
+    console.print("\n[dim]Pressione Enter para voltar ao menu...[/dim]")
+    input()
+
+def verify_authentication_code():
+    """Verifica a autenticidade de um código de certificado."""
+    console.clear()
+    console.print("[bold blue]== Verificação de Autenticidade de Certificado ==[/bold blue]\n")
+    
+    # Solicitar código de autenticação ou verificação
+    code_type = quiet_select(
+        "Tipo de código que você possui:",
+        choices=[
+            "Código de autenticação completo (32 caracteres)",
+            "Código de verificação curto (8-9 caracteres)",
+            "Voltar"
+        ],
+        style=get_menu_style()
+    )
+    
+    if code_type == "Voltar":
+        return
+    
+    # Solicitar o código conforme o tipo selecionado
+    if code_type == "Código de autenticação completo (32 caracteres)":
+        codigo = quiet_text("Digite o código de autenticação:").strip()
+    else:
+        codigo = quiet_text("Digite o código de verificação:").strip()
+    
+    if not codigo:
+        console.print("[yellow]Operação cancelada.[/yellow]")
+        return
+    
+    # Verificar o código
+    with console.status("[bold green]Verificando código..."):
+        result = auth_manager.verificar_codigo(codigo)
+    
+    if result:
+        console.print("[bold green]✓ Certificado autêntico![/bold green]\n")
+        
+        # Exibir detalhes do certificado
+        table = Table(box=box.SIMPLE)
+        table.add_column("Campo", style="cyan")
+        table.add_column("Valor")
+        
+        for campo, valor in result.items():
+            if campo not in ['codigo_verificacao', 'data_geracao']:  # Campos que não precisam ser exibidos
+                table.add_row(campo, str(valor))
+        
+        console.print(table)
+        
+        # Opções adicionais
+        options = quiet_select(
+            "Opções adicionais:",
+            choices=[
+                "Verificar outro código",
+                "Voltar ao menu"
+            ],
+            style=get_menu_style()
+        )
+        
+        if options == "Verificar outro código":
+            verify_authentication_code()  # Recursivamente chama a mesma função
+        
+    else:
+        console.print("[bold red]❌ Código inválido ou não encontrado![/bold red]")
+        console.print("\nPossíveis causas:")
+        console.print("• O código foi digitado incorretamente")
+        console.print("• O certificado não existe no sistema")
+        console.print("• O certificado está em uma base de dados diferente")
+        
+        retry = quiet_confirm("Deseja tentar novamente?")
+        if retry:
+            verify_authentication_code()  # Recursivamente chama a mesma função
     
     console.print("\n[dim]Pressione Enter para voltar ao menu...[/dim]")
     input()

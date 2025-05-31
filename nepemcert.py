@@ -91,7 +91,10 @@ def generate(csv_file, template, output, zip, zip_name):
         placeholders = template_manager_obj.extract_placeholders(template_content)
         console.print(f"Placeholders encontrados no template: {len(placeholders)}")
         
-        with console.status("[bold green]Processando certificados...") as status:
+        with console.status("[bold green]Processando certificados...") as status:            # Inicializar o gerenciador de autenticação
+            from app.authentication_manager import AuthenticationManager
+            auth_manager = AuthenticationManager()
+            
             for index, row in df.iterrows():
                 # Obter dados do CSV
                 csv_data = row.to_dict()
@@ -99,6 +102,21 @@ def generate(csv_file, template, output, zip, zip_name):
                 # Mesclar com valores padrão (parâmetros.json)
                 data = parameter_manager.merge_placeholders(csv_data, theme)
                 
+                # Gerar código de autenticação e QR code
+                nome = data.get('nome', f"Participante {index+1}")
+                evento = data.get('evento', "Evento")
+                data_evento = data.get('data', "")
+                
+                codigo_autenticacao = auth_manager.gerar_codigo_autenticacao(
+                    nome_participante=nome,
+                    evento=evento,
+                    data_evento=data_evento
+                )
+                  # Adicionar informações de autenticação aos dados
+                data['codigo_autenticacao'] = codigo_autenticacao
+                data['url_verificacao'] = "https://nepemcertificados.com/verificar-certificados/"
+                data['qrcode_base64'] = auth_manager.gerar_qrcode_base64(codigo_autenticacao)
+
                 # Informar sobre placeholders ainda não preenchidos
                 missing_placeholders = [p for p in placeholders if p not in data]
                 if missing_placeholders and index == 0:  # Mostrar apenas para o primeiro certificado
@@ -129,8 +147,18 @@ def generate(csv_file, template, output, zip, zip_name):
                     html_contents.append(html_content)
                     file_names.append(file_path)
                     
-                    # Atualizar status
+            # Atualizar status
                     console.print(f"Processando certificado {index+1}/{len(df)}: {data.get('nome', f'Registro {index+1}')}", end="\r")
+                    
+                    # Salvar informações do certificado para verificação posterior
+                    auth_manager.salvar_codigo(
+                        data['codigo_autenticacao'],
+                        data['nome'],
+                        data.get('evento', 'Evento'),
+                        data.get('data', ''),
+                        data.get('local', 'Local não especificado'),
+                        data.get('carga_horaria', '0')
+                    )
                     
                 finally:
                     # Limpar arquivo temporário
@@ -224,6 +252,7 @@ def debug_themes(template, output, zip):
     from app.parameter_manager import ParameterManager
     from app.template_manager import TemplateManager
     from app.theme_manager import ThemeManager
+    from app.authentication_manager import AuthenticationManager
     
     console.print(f"[bold blue]🐛 DEBUG: Gerando certificados com todos os temas...[/bold blue]")
     console.print(f"- Template: [cyan]{template}[/cyan]")
@@ -241,27 +270,38 @@ def debug_themes(template, output, zip):
         with open(template, 'r', encoding='utf-8') as f:
             template_content = f.read()
         console.print(f"[green]✓[/green] Template carregado")
-        
-        # Inicializar geradores
+          # Inicializar geradores
         pdf_generator = PDFGenerator(output_dir=output)
         zip_exporter = ZipExporter()
         parameter_manager = ParameterManager()
         template_manager_obj = TemplateManager()
         theme_manager = ThemeManager()
+        auth_manager = AuthenticationManager()
         
-        # Dados de exemplo fixos
+        # Dados para geração de código de autenticação
+        nome_exemplo = "Maria Clara Desenvolvimento"
+        evento_exemplo = "Curso Avançado de Desenvolvimento de Software"
+        data_exemplo = "22 a 24 de maio de 2025"        # Gerar código de autenticação único
+        codigo_autenticacao = auth_manager.gerar_codigo_autenticacao(
+            nome_participante=nome_exemplo,
+            evento=evento_exemplo,
+            data_evento=data_exemplo
+        )
+        qrcode_url = auth_manager.gerar_qrcode_data(codigo_autenticacao)
+        qrcode_base64 = auth_manager.gerar_qrcode_base64(codigo_autenticacao)          # Dados de exemplo fixos
         sample_data = {
-            "nome": "Maria Clara Desenvolvimento",
-            "evento": "Curso Avançado de Desenvolvimento de Software",
+            "nome": nome_exemplo,
+            "evento": evento_exemplo,
             "local": "Centro de Tecnologia e Inovação - Auditório Principal",
-            "data": "22 a 24 de maio de 2025",
+            "data": data_exemplo,
             "carga_horaria": "24",
             "coordenador": "Prof. Dr. Ana Carolina Fernandes",
             "diretor": "Prof. Dr. Carlos Eduardo Martins",
-            "cidade": "São Paulo",
+            "cidade": "São Paulo",            
             "data_emissao": "29 de maio de 2025",
-            "codigo_verificacao": "DEBUG-CMD-2025-001",
-            "url_verificacao": "https://certificados.debug.local",
+            "codigo_autenticacao": codigo_autenticacao,
+            "url_verificacao": "https://nepemufsc.com/verificar-certificados/",
+            "qrcode_base64": qrcode_base64,
             "intro_text": "Certificamos que",
             "participation_text": "participou com êxito do",
             "location_text": "realizado em",
