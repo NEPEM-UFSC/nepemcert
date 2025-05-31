@@ -45,43 +45,63 @@ if sys.platform.startswith('win'):
 # Wrapper functions para questionary que suprimem stderr
 def quiet_select(message, choices, **kwargs):
     """Wrapper para questionary.select que suprime mensagens de erro."""
-    if sys.platform.startswith('win'):
-        with redirect_stderr(StringIO()):
-            return quiet_select(message, choices, **kwargs).ask()
-    else:
-        return quiet_select(message, choices, **kwargs).ask()
+    try:
+        if sys.platform.startswith('win'):
+            with redirect_stderr(StringIO()):
+                return questionary.select(message, choices, **kwargs).ask()
+        else:
+            return questionary.select(message, choices, **kwargs).ask()
+    except Exception as e:
+        console.print(f"[red]Erro ao exibir seleção: {e}[/red]")
+        return choices[0] if choices else None
 
 def quiet_text(message, **kwargs):
     """Wrapper para questionary.text que suprime mensagens de erro."""
-    if sys.platform.startswith('win'):
-        with redirect_stderr(StringIO()):
-            return quiet_text(message, **kwargs).ask()
-    else:
-        return quiet_text(message, **kwargs).ask()
+    try:
+        if sys.platform.startswith('win'):
+            with redirect_stderr(StringIO()):
+                return questionary.text(message, **kwargs).ask()
+        else:
+            return questionary.text(message, **kwargs).ask()
+    except Exception as e:
+        console.print(f"[red]Erro ao solicitar texto: {e}[/red]")
+        return kwargs.get('default', "")
 
 def quiet_confirm(message, **kwargs):
     """Wrapper para questionary.confirm que suprime mensagens de erro."""
-    if sys.platform.startswith('win'):
-        with redirect_stderr(StringIO()):
-            return quiet_confirm(message, **kwargs).ask()
-    else:
-        return quiet_confirm(message, **kwargs).ask()
+    try:
+        if sys.platform.startswith('win'):
+            with redirect_stderr(StringIO()):
+                return questionary.confirm(message, **kwargs).ask()
+        else:
+            return questionary.confirm(message, **kwargs).ask()
+    except Exception as e:
+        console.print(f"[red]Erro ao solicitar confirmação: {e}[/red]")
+        return kwargs.get('default', False)
 
 def quiet_checkbox(message, choices, **kwargs):
     """Wrapper para questionary.checkbox que suprime mensagens de erro."""
-    if sys.platform.startswith('win'):
-        with redirect_stderr(StringIO()):
-            return quiet_checkbox(message, choices, **kwargs).ask()
-    else:
-                return quiet_checkbox(message, choices, **kwargs).ask()
+    try:
+        if sys.platform.startswith('win'):
+            with redirect_stderr(StringIO()):
+                return questionary.checkbox(message, choices, **kwargs).ask()
+        else:
+            return questionary.checkbox(message, choices, **kwargs).ask()
+    except Exception as e:
+        console.print(f"[red]Erro ao exibir checkbox: {e}[/red]")
+        return []
 
 def quiet_path(message, **kwargs):
     """Wrapper para questionary.path que suprime mensagens de erro."""
-    if sys.platform.startswith('win'):
-        with redirect_stderr(StringIO()):
-            return quiet_path(message, **kwargs).ask()
-    else:
-        return quiet_path(message, **kwargs).ask()
+    try:
+        if sys.platform.startswith('win'):
+            with redirect_stderr(StringIO()):
+                return questionary.path(message, **kwargs).ask()
+        else:
+            return questionary.path(message, **kwargs).ask()
+    except Exception as e:
+        console.print(f"[red]Erro ao solicitar caminho: {e}[/red]")
+        return kwargs.get('default', "")
 
 # Importação dos módulos da aplicação
 from app.csv_manager import CSVManager
@@ -157,7 +177,6 @@ def print_header():
 def main_menu():
     """Exibe o menu principal da aplicação."""
     print_header()
-    
     choice = quiet_select(
         "Selecione uma opção:",
         choices=[
@@ -165,13 +184,13 @@ def main_menu():
             "🎨 Gerenciar Templates",
             "⚙️ Configurações",
             "🔄 Sincronização e Conectividade",
+            "🐛 DEBUG: Comparar temas",
             "❓ Ajuda",
             "🚪 Sair"
         ],
         use_indicator=True,
         style=get_menu_style()
-    ).ask()
-    
+    )
     if choice == "🔖 Gerar Certificados":
         generate_certificates_menu()
     elif choice == "🎨 Gerenciar Templates":
@@ -180,6 +199,8 @@ def main_menu():
         settings_menu()
     elif choice == "🔄 Sincronização e Conectividade":
         connectivity_menu()
+    elif choice == "🐛 DEBUG: Comparar temas":
+        debug_compare_themes()
     elif choice == "❓ Ajuda":
         show_help()
     elif choice == "🚪 Sair":
@@ -203,7 +224,7 @@ def generate_certificates_menu():
             "↩️ Voltar ao menu principal"
         ],
         style=get_menu_style()
-    ).ask()
+    )
     
     if choice == "📄 Gerar certificados em lote":
         generate_batch_certificates()
@@ -231,7 +252,7 @@ def manage_templates_menu():
             "↩️ Voltar ao menu principal"
         ],
         style=get_menu_style()
-    ).ask()
+    )
     
     if choice == "📝 Listar templates disponíveis":
         list_templates()
@@ -262,7 +283,7 @@ def settings_menu():
             "↩️ Voltar ao menu principal"
         ],
         style=get_menu_style()
-    ).ask()
+    )
     
     if choice == "📁 Diretórios de trabalho":
         configure_directories()
@@ -292,7 +313,7 @@ def connectivity_menu():
             "↩️ Voltar ao menu principal"
         ],
         style=get_menu_style()
-    ).ask()
+    )
     
     if choice == "🔄 Verificar status da conexão":
         check_connection()
@@ -366,19 +387,18 @@ def generate_batch_certificates():
     """Gera certificados em lote."""
     console.clear()
     console.print("[bold blue]== Geração de Certificados em Lote ==[/bold blue]\n")
-    
-    # Selecionar arquivo CSV
+      # Selecionar arquivo CSV
     csv_path = quiet_path(
         "Selecione o arquivo CSV com nomes dos participantes:",
         validate=lambda path: os.path.exists(path) and path.endswith('.csv')
-    ).ask()
+    )
     
     if not csv_path:
         console.print("[yellow]Operação cancelada.[/yellow]")
         return
     
     # Verificar se o CSV tem cabeçalho
-    has_header = quiet_confirm("O arquivo CSV possui linha de cabeçalho?").ask()
+    has_header = quiet_confirm("O arquivo CSV possui linha de cabeçalho?")
     
     # Carregar dados do CSV
     with console.status("[bold green]Carregando dados do CSV..."):
@@ -406,10 +426,10 @@ def generate_batch_certificates():
     
     # Solicitar informações do evento
     console.print("\n[bold]Informações do Evento[/bold]")
-    evento = quiet_text("Nome do evento:").ask()
-    data = quiet_text("Data do evento (ex: 15/05/2023):", default=datetime.now().strftime("%d/%m/%Y")).ask()
-    local = quiet_text("Local do evento:").ask()
-    carga_horaria = quiet_text("Carga horária (horas):").ask()
+    evento = quiet_text("Nome do evento:")
+    data = quiet_text("Data do evento (ex: 15/05/2023):", default=datetime.now().strftime("%d/%m/%Y"))
+    local = quiet_text("Local do evento:")
+    carga_horaria = quiet_text("Carga horária (horas):")
     
     # Revisar informações
     while True:
@@ -440,18 +460,18 @@ def generate_batch_certificates():
                 "Cancelar operação"
             ],
             style=get_menu_style()
-        ).ask()
+        )
         
         if choice == "Não, continuar":
             break
         elif choice == "Modificar nome do evento":
-            evento = quiet_text("Nome do evento:", default=evento).ask()
+            evento = quiet_text("Nome do evento:", default=evento)
         elif choice == "Modificar data":
-            data = quiet_text("Data do evento:", default=data).ask()
+            data = quiet_text("Data do evento:", default=data)
         elif choice == "Modificar local":
-            local = quiet_text("Local do evento:", default=local).ask()
+            local = quiet_text("Local do evento:", default=local)
         elif choice == "Modificar carga horária":
-            carga_horaria = quiet_text("Carga horária (horas):", default=carga_horaria).ask()
+            carga_horaria = quiet_text("Carga horária (horas):", default=carga_horaria)
         elif choice == "Cancelar operação":
             console.print("[yellow]Operação cancelada.[/yellow]")
             return
@@ -465,7 +485,7 @@ def generate_batch_certificates():
         "Selecione o template a ser utilizado:",
         choices=templates,
         style=get_menu_style()
-    ).ask()
+    )
     
     if not template_name:
         console.print("[yellow]Operação cancelada.[/yellow]")
@@ -477,7 +497,7 @@ def generate_batch_certificates():
         "Selecione um tema para os certificados:",
         choices=themes,
         style=get_menu_style()
-    ).ask()
+    )
     
     theme = None if selected_theme == "Nenhum" else selected_theme
     
@@ -510,11 +530,11 @@ def generate_batch_certificates():
         console.print(table)
         
         # Perguntar se deseja modificar os parâmetros
-        modify = quiet_confirm("Deseja modificar os parâmetros institucionais?").ask()
+        modify = quiet_confirm("Deseja modificar os parâmetros institucionais?")
         
         if modify:
             for campo, valor in institutional_params.items():
-                novo_valor = quiet_text(f"{campo}:", default=valor).ask()
+                novo_valor = quiet_text(f"{campo}:", default=valor)
                 institutional_params[campo] = novo_valor
             
             # Atualizar parâmetros
@@ -527,7 +547,7 @@ def generate_batch_certificates():
         "Pasta de destino para os certificados:",
         default=pdf_generator.output_dir,
         only_directories=True
-    ).ask()
+    )
     
     if not output_dir:
         output_dir = pdf_generator.output_dir
@@ -548,7 +568,7 @@ def generate_batch_certificates():
     console.print(f"- Tema: [cyan]{selected_theme}[/cyan]")
     console.print(f"- Destino: [cyan]{output_dir}[/cyan]")
     
-    confirm = quiet_confirm("Deseja iniciar a geração dos certificados?").ask()
+    confirm = quiet_confirm("Deseja iniciar a geração dos certificados?")
     
     if not confirm:
         console.print("[yellow]Operação cancelada.[/yellow]")
@@ -630,13 +650,13 @@ def generate_batch_certificates():
         console.print(f"[bold green]✓ {len(generated_paths)} certificados gerados com sucesso![/bold green]")
         
         # Oferecer opção para criar ZIP
-        zip_option = quiet_confirm("Deseja empacotar os certificados em um arquivo ZIP?").ask()
+        zip_option = quiet_confirm("Deseja empacotar os certificados em um arquivo ZIP?")
         
         if zip_option:
             zip_name = quiet_text(
                 "Nome do arquivo ZIP:",
                 default=f"{evento.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.zip"
-            ).ask()
+            )
             
             if not zip_name.endswith('.zip'):
                 zip_name += '.zip'
@@ -665,14 +685,14 @@ def preview_imported_data():
     csv_path = quiet_path(
         "Selecione o arquivo CSV para visualizar:",
         validate=lambda path: os.path.exists(path) and path.endswith('.csv')
-    ).ask()
+    )
     
     if not csv_path:
         console.print("[yellow]Operação cancelada.[/yellow]")
         return
     
     # Verificar se o CSV tem cabeçalho
-    has_header = quiet_confirm("O arquivo CSV possui linha de cabeçalho?").ask()
+    has_header = quiet_confirm("O arquivo CSV possui linha de cabeçalho?")
     
     # Carregar e mostrar dados
     try:
@@ -728,7 +748,7 @@ def test_certificate_generation():
         "Selecione o template a ser utilizado:",
         choices=templates,
         style=get_menu_style()
-    ).ask()
+    )
     
     if not template_name:
         console.print("[yellow]Operação cancelada.[/yellow]")
@@ -754,7 +774,7 @@ def test_certificate_generation():
     console.print("[bold]Informe os valores para os campos:[/bold]\n")
     
     for placeholder in placeholders:
-        value = quiet_text(f"Valor para '{placeholder}':").ask()
+        value = quiet_text(f"Valor para '{placeholder}':")
         test_data[placeholder] = value
     
     # Gerar PDF de teste
@@ -784,7 +804,7 @@ def test_certificate_generation():
         console.print(f"[bold]Caminho:[/bold] {output_path}")
         
         # Oferecer opção para abrir o PDF
-        open_option = quiet_confirm("Deseja abrir o certificado gerado?").ask()
+        open_option = quiet_confirm("Deseja abrir o certificado gerado?")
         
         if open_option:
             import subprocess
@@ -846,7 +866,7 @@ def import_template():
     template_path = quiet_path(
         "Selecione o arquivo HTML do template:",
         validate=lambda path: os.path.exists(path) and path.lower().endswith('.html')
-    ).ask()
+    )
     
     if not template_path:
         console.print("[yellow]Operação cancelada.[/yellow]")
@@ -856,7 +876,7 @@ def import_template():
     template_name = quiet_text(
         "Nome para salvar o template:",
         default=os.path.basename(template_path)
-    ).ask()
+    )
     
     if not template_name:
         console.print("[yellow]Operação cancelada.[/yellow]")
@@ -870,7 +890,7 @@ def import_template():
     if template_name in templates:
         overwrite = quiet_confirm(
             f"Já existe um template com o nome '{template_name}'. Deseja sobrescrever?"
-        ).ask()
+        )
         
         if not overwrite:
             console.print("[yellow]Operação cancelada.[/yellow]")
@@ -910,7 +930,7 @@ def edit_template():
         "Selecione o template para editar:",
         choices=templates,
         style=get_menu_style()
-    ).ask()
+    )
     
     if not template_name:
         console.print("[yellow]Operação cancelada.[/yellow]")
@@ -929,7 +949,7 @@ def edit_template():
     console.print("[yellow]Para edições complexas, recomendamos usar um editor HTML externo.[/yellow]\n")
     
     # Oferecer opção para abrir em um editor externo
-    open_option = quiet_confirm("Deseja abrir o template em um editor externo?").ask()
+    open_option = quiet_confirm("Deseja abrir o template em um editor externo?")
     
     if open_option:
         template_path = os.path.join(template_manager.templates_dir, template_name)
@@ -972,7 +992,7 @@ def delete_template():
         "Selecione o template para excluir:",
         choices=templates,
         style=get_menu_style()
-    ).ask()
+    )
     
     if not template_name:
         console.print("[yellow]Operação cancelada.[/yellow]")
@@ -981,7 +1001,7 @@ def delete_template():
     # Confirmar exclusão
     confirm = quiet_confirm(
         f"Tem certeza que deseja excluir o template '{template_name}'? Esta ação não pode ser desfeita."
-    ).ask()
+    )
     
     if not confirm:
         console.print("[yellow]Operação cancelada.[/yellow]")
@@ -1017,7 +1037,7 @@ def preview_template():
         "Selecione o template para visualizar:",
         choices=templates,
         style=get_menu_style()
-    ).ask()
+    )
     
     if not template_name:
         console.print("[yellow]Operação cancelada.[/yellow]")
@@ -1046,7 +1066,7 @@ def preview_template():
         console.print("\n[yellow]Nenhum placeholder detectado no template.[/yellow]")
     
     # Oferecer opção para gerar uma prévia em PDF com dados fictícios
-    preview_option = quiet_confirm("Deseja gerar uma prévia em PDF com dados de exemplo?").ask()
+    preview_option = quiet_confirm("Deseja gerar uma prévia em PDF com dados de exemplo?")
     
     if preview_option:
         # Criar dados de exemplo para os placeholders
@@ -1081,7 +1101,7 @@ def preview_template():
             console.print(f"[bold]Caminho:[/bold] {preview_path}")
             
             # Oferecer opção para abrir o PDF
-            open_option = quiet_confirm("Deseja abrir a prévia em PDF?").ask()
+            open_option = quiet_confirm("Deseja abrir a prévia em PDF?")
             
             if open_option:
                 import subprocess
@@ -1128,7 +1148,7 @@ def configure_generation_parameters():
             "↩️ Voltar"
         ],
         style=get_menu_style()
-    ).ask()
+    )
     
     if choice == "📝 Valores para campos institucionais":
         configure_institutional_placeholders()
@@ -1171,12 +1191,12 @@ def configure_institutional_placeholders():
             "↩️ Voltar"
         ],
         style=get_menu_style()
-    ).ask()
+    )
     
     if choice == "➕ Adicionar/editar campo":
-        field = quiet_text("Nome do campo:").ask()
+        field = quiet_text("Nome do campo:")
         if field:
-            value = quiet_text(f"Valor para '{field}':").ask()
+            value = quiet_text(f"Valor para '{field}':")
             if field and value:
                 parameter_manager.update_institutional_placeholders({field: value})
                 console.print(f"[green]✓[/green] Campo '{field}' atualizado.")
@@ -1194,10 +1214,10 @@ def configure_institutional_placeholders():
             "Selecione o campo para remover:",
             choices=list(institutional.keys()) + ["Cancelar"],
             style=get_menu_style()
-        ).ask()
+        )
         
         if field_to_remove and field_to_remove != "Cancelar":
-            confirm = quiet_confirm(f"Tem certeza que deseja remover '{field_to_remove}'?").ask()
+            confirm = quiet_confirm(f"Tem certeza que deseja remover '{field_to_remove}'?")
             if confirm:
                 params = parameter_manager.parameters
                 if "institutional_placeholders" in params and field_to_remove in params["institutional_placeholders"]:
@@ -1327,7 +1347,7 @@ def debug_compare_themes():
         "Selecione o template para usar:",
         choices=templates,
         style=get_menu_style()
-    ).ask()
+    )
     
     if not template_name:
         console.print("[yellow]Operação cancelada.[/yellow]")
@@ -1379,7 +1399,7 @@ def debug_compare_themes():
     confirm = quiet_confirm(
         f"Deseja gerar {len(available_themes)} certificados (um para cada tema)?",
         default=True
-    ).ask()
+    )
     
     if not confirm:
         console.print("[yellow]Operação cancelada.[/yellow]")
@@ -1473,7 +1493,7 @@ def debug_compare_themes():
                 "↩️ Voltar ao menu"
             ],
             style=get_menu_style()
-        ).ask()
+        )
         
         if action == "📁 Abrir diretório de saída":
             try:
