@@ -197,203 +197,138 @@ class ThemeManager:
             os.remove(theme_path)
             return True
         
-        return False
-    
+        return False    
     def apply_theme_to_template(self, html_content, theme_settings):
-        """Aplica as configurações de tema ao HTML do template"""
-        # Extrair as configurações do tema
+        """
+        Aplica as configurações de tema ao HTML do template de forma não-destrutiva.
+        Modifica apenas propriedades decorativas (cores, fontes, bordas) preservando a estrutura.
+        NÃO modifica tamanhos de fonte ou margens para evitar problemas de layout.
+        """
+        # Extrair configurações do tema - apenas cores e fontes
         font_family = theme_settings.get("font_family", "Arial, sans-serif")
-        heading_color = theme_settings.get("heading_color", "#1a5276")
         text_color = theme_settings.get("text_color", "#333333")
         background_color = theme_settings.get("background_color", "#ffffff")
-        border_color = theme_settings.get("border_color", "#dddddd")
-        border_width = theme_settings.get("border_width", "1px")
+        border_color = theme_settings.get("border_color", "#1a5276")
+        border_width = theme_settings.get("border_width", "4px")
         border_style = theme_settings.get("border_style", "solid")
-        bg_image_base64 = theme_settings.get("background_image")
-        margin = theme_settings.get("margin", "40px")
-        heading_size = theme_settings.get("heading_size", "32px")
-        text_size = theme_settings.get("text_size", "16px")
-        
-        # Extrair propriedades adicionais específicas para certificados
-        title_font_size = theme_settings.get("title_font_size", "48px")
-        content_font_size = theme_settings.get("content_font_size", "24px")
-        name_font_size = theme_settings.get("name_font_size", "36px")
         name_color = theme_settings.get("name_color", "#1a4971")
-        title_color = theme_settings.get("title_color", heading_color)
+        title_color = theme_settings.get("title_color", "#1a5276")
         signature_color = theme_settings.get("signature_color", "#333333")
-        signature_text_size = theme_settings.get("signature_text_size", "14px")
-        footer_style = theme_settings.get("footer_style", "classic")
+        event_name_color = theme_settings.get("event_name_color", "#1a5276")
+        link_color = theme_settings.get("link_color", "#1a5276")
+        bg_image_base64 = theme_settings.get("background_image")
         
-        # Garantir que apenas fontes seguras sejam usadas (evita importação de fontes da web)
-        # WeasyPrint tem melhor suporte a fontes importadas via CSS
+        # Garantir que apenas fontes seguras sejam usadas
         safe_fonts = {
-            "'Crimson Text', 'Garamond', 'Times New Roman', serif": "Times, Times New Roman, serif",
-            "'Cormorant Garamond', 'Palatino Linotype', 'Book Antiqua', serif": "Palatino, Times New Roman, serif",
+            "'Crimson Text', 'Garamond', 'Times New Roman', serif": "Times, 'Times New Roman', serif",
+            "'Cormorant Garamond', 'Palatino Linotype', 'Book Antiqua', serif": "Palatino, 'Times New Roman', serif",
             "'Montserrat', 'Helvetica Neue', Arial, sans-serif": "Helvetica, Arial, sans-serif",
             "'Raleway', 'Roboto', 'Segoe UI', sans-serif": "Helvetica, Arial, sans-serif",
             "'Poppins', 'Open Sans', Helvetica, sans-serif": "Helvetica, Arial, sans-serif"
         }
-        
-        # Substituir pela fonte segura correspondente, ou manter a fonte padrão se não estiver mapeada
         font_family = safe_fonts.get(font_family, font_family)
         
-        # Criar o CSS baseado nas configurações (sem importar fontes externas)
-        custom_css = f"""
-        <style>
-            @page {{
-                size: A4 landscape;
-                margin: 0;
-            }}
-            
-            body {{
-                margin: 0;
-                padding: 0;
-                font-family: {font_family};
-                color: {text_color};
-                background-color: {background_color};
-                width: 100%;
-                height: 100%;
-            }}
-            
-            .certificate {{
-                width: 297mm;
-                height: 210mm;
-                background-color: {background_color};
-                {f"background-image: url('data:image/png;base64,{bg_image_base64}');" if bg_image_base64 else ""}
-                background-size: cover;
-                background-position: center;
-                background-repeat: no-repeat;
-                padding: 20mm;
-                box-sizing: border-box;
-                position: relative;
-                color: {text_color};
-                text-align: center;
-                border: {border_width} {border_style} {border_color};
-                box-shadow: 0 0 15px rgba(0,0,0,0.1);
-            }}
-            
-            .header {{
-                margin-bottom: 15mm;
-            }}
-            
-            .logo {{
-                max-width: 150px;
-                margin-bottom: 10mm;
-            }}
-            
-            .title {{
-                font-size: {title_font_size};
-                font-weight: 700;
-                color: {title_color};
-                margin-bottom: 20mm;
-                text-transform: uppercase;
-                letter-spacing: 1px;
-            }}
-            
-            .content {{
-                font-size: {content_font_size};
-                line-height: 1.6;
-                margin-bottom: 25mm;
-            }}
-            
-            .name {{
-                font-size: {name_font_size};
-                font-weight: bold;
-                color: {name_color};
-                margin: 10mm 0;
-                border-bottom: 2px solid {name_color};
-                display: inline-block;
-                padding: 0 20mm 5mm;
-                letter-spacing: 0.5px;
-            }}
-            
-            .footer {{
-                display: flex;
-                justify-content: space-around;
-                margin-top: 15mm;
-            }}
-            
-            .signature {{
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-            }}
-            
-            .signature-line {{
-                width: 60mm;
-                border-top: 1px solid {signature_color};
-                margin-bottom: 5mm;
-            }}
-            
-            .signature-name {{
-                font-weight: bold;
-                color: {signature_color};
-                font-size: {signature_text_size};
-            }}
-            
-            .date {{
-                font-size: 18px;
-                margin-top: 10mm;
-                font-style: italic;
-            }}
-            
-            .verification {{
-                position: absolute;
-                bottom: 10mm;
-                left: 20mm;
-                font-size: 12px;
-                text-align: left;
-                color: #666;
-            }}
-            
-            .verification-code {{
-                font-weight: bold;
-                font-family: monospace;
-                color: {signature_color};
-                margin: 2mm 0;
-            }}
-            
-            /* Estilos específicos para diferentes tipos de rodapé */
-            .footer.classic .signature-line {{
-                border-top-style: solid;
-            }}
-            
-            .footer.modern .signature-line {{
-                border-top-style: solid;
-                width: 50mm;
-            }}
-            
-            .footer.minimalist .signature-line {{
-                border-top-style: solid;
-                width: 40mm;
-                border-top-width: 1px;
-            }}
-            
-            .footer.formal .signature-line {{
-                border-top-style: double;
-                border-top-width: 3px;
-                width: 65mm;
-            }}
-            
-            .footer.clean .signature-line {{
-                border-top-style: solid;
-                border-top-width: 1px;
-                width: 50mm;
-            }}
-        </style>
-        """
+        # 1. Modificar fonte da família no body
+        html_content = re.sub(
+            r'(body\s*\{[^}]*?)font-family:\s*[^;]+;',
+            f'\\1font-family: {font_family};',
+            html_content,
+            flags=re.MULTILINE | re.DOTALL
+        )
         
-        # Verificar se o template já tem uma tag <style>
-        if "<style>" in html_content:
-            # Substituir o estilo existente
-            html_content = re.sub(r'<style>.*?</style>', custom_css, html_content, flags=re.DOTALL)
-        else:
-            # Adicionar o estilo após a tag <head>
-            if "<head>" in html_content:
-                html_content = html_content.replace("<head>", "<head>" + custom_css)
+        # 2. Modificar cor de fundo do body
+        html_content = re.sub(
+            r'(body\s*\{[^}]*?)background-color:\s*[^;]+;',
+            f'\\1background-color: {background_color};',
+            html_content,
+            flags=re.MULTILINE | re.DOTALL
+        )
+        
+        # 3. Modificar borda do body
+        html_content = re.sub(
+            r'(body\s*\{[^}]*?)border:\s*[^;]+;',
+            f'\\1border: {border_width} {border_style} {border_color};',
+            html_content,
+            flags=re.MULTILINE | re.DOTALL
+        )
+          # 4. Modificar cor da fonte do título (mantendo tamanho original)
+        html_content = re.sub(
+            r'(\.title\s*\{[^}]*?)color:\s*[^;]+;',
+            f'\\1color: {title_color};',
+            html_content,
+            flags=re.MULTILINE | re.DOTALL
+        )
+        
+        # 5. Modificar cor da fonte do conteúdo principal (mantendo tamanho original)
+        html_content = re.sub(
+            r'(\.content\s*\{[^}]*?)color:\s*[^;]+;',
+            f'\\1color: {text_color};',
+            html_content,
+            flags=re.MULTILINE | re.DOTALL
+        )
+          # 6. Modificar nome do participante (apenas cor da fonte e da borda)
+        html_content = re.sub(
+            r'(\.participant-name\s*\{[^}]*?)color:\s*[^;]+;',
+            f'\\1color: {name_color};',
+            html_content,
+            flags=re.MULTILINE | re.DOTALL
+        )
+        
+        html_content = re.sub(
+            r'(\.participant-name\s*\{[^}]*?)border-bottom:\s*[^;]+;',
+            f'\\1border-bottom: 2px solid {name_color};',
+            html_content,
+            flags=re.MULTILINE | re.DOTALL
+        )
+        
+        # 7. Modificar cor do nome do evento
+        html_content = re.sub(
+            r'(\.event-name\s*\{[^}]*?)color:\s*[^;]+;',
+            f'\\1color: {event_name_color};',
+            html_content,
+            flags=re.MULTILINE | re.DOTALL
+        )
+        
+        # 8. Modificar linha das assinaturas
+        html_content = re.sub(
+            r'(\.signature-line\s*\{[^}]*?)border-top:\s*[^;]+;',
+            f'\\1border-top: 1px solid {signature_color};',
+            html_content,
+            flags=re.MULTILINE | re.DOTALL
+        )
+          # 9. Modificar cor da fonte das assinaturas (mantendo tamanho original)
+        html_content = re.sub(
+            r'(\.signature-name\s*\{[^}]*?)color:\s*[^;]+;',
+            f'\\1color: {signature_color};',
+            html_content,
+            flags=re.MULTILINE | re.DOTALL
+        )
+        
+        # 10. Modificar cor dos links
+        html_content = re.sub(
+            r'(\.nepemcert-link\s*\{[^}]*?)color:\s*[^;]+;',
+            f'\\1color: {link_color};',
+            html_content,
+            flags=re.MULTILINE | re.DOTALL
+        )
+        
+        # 11. Adicionar imagem de fundo se fornecida (apenas adiciona propriedades, não muda estrutura)
+        if bg_image_base64:
+            if "background-image:" in html_content:
+                html_content = re.sub(
+                    r'(body\s*\{[^}]*?)background-image:\s*[^;]+;',
+                    f'\\1background-image: url("data:image/png;base64,{bg_image_base64}");',
+                    html_content,
+                    flags=re.MULTILINE | re.DOTALL
+                )
             else:
-                # Se não houver tag <head>, adicionar no início
-                html_content = custom_css + html_content
+                # Adicionar propriedades de background após background-color
+                html_content = re.sub(
+                    r'(body\s*\{[^}]*?background-color:\s*[^;]+;)',
+                    f'\\1\n            background-image: url("data:image/png;base64,{bg_image_base64}");\n            background-size: cover;\n            background-position: center;\n            background-repeat: no-repeat;',
+                    html_content,
+                    flags=re.MULTILINE | re.DOTALL
+                )
         
         return html_content
     
@@ -425,30 +360,24 @@ class ThemeManager:
             # Aplicar customizações
             theme_settings = base_settings.copy()
             theme_settings.update(customizations)
-        else:
-            # Criar do zero com valores padrão
+        else:            # Criar do zero com valores padrão (apenas cores e fontes)
             theme_settings = {
                 "font_family": "Arial, sans-serif",
                 "heading_color": "#1a5276",
                 "text_color": "#333333",
                 "background_color": "#ffffff",
                 "border_color": "#dddddd",
-                "border_width": "1px",
+                "border_width": "4px",
                 "border_style": "solid",
-                "margin": "40px",
-                "heading_size": "32px",
-                "title_font_size": "48px",
-                "text_size": "16px",
-                "content_font_size": "24px",
-                "name_font_size": "36px",
                 "name_color": "#1a4971",
                 "title_color": "#1a5276",
+                "event_name_color": "#1a5276",
+                "link_color": "#1a5276",
                 "title_text": "Certificado",
                 "intro_text": "Certifica-se que",
                 "participation_text": "participou do evento",
                 "footer_style": "classic",
                 "signature_color": "#333333",
-                "signature_text_size": "14px",
                 "background_image": None
             }
             # Aplicar customizações
