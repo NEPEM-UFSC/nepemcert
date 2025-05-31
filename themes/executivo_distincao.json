@@ -1,0 +1,19 @@
+{
+  "font_family": "Arial, sans-serif",
+  "heading_color": "#4a4a4a",
+  "text_color": "#2c2c2c",
+  "background_color": "#f7f7f7",
+  "border_color": "#b0b0b0",
+  "border_width": "3px",
+  "border_style": "double",
+  "name_color": "#4a4a4a",
+  "title_color": "#4a4a4a",
+  "event_name_color": "#4a4a4a",
+  "link_color": "#4a4a4a",
+  "title_text": "Certificado de Distinção",
+  "intro_text": "Certificamos formalmente que",
+  "participation_text": "completou com êxito o programa",
+  "footer_style": "classic",
+  "signature_color": "#1c1c1c",
+  "background_image": null
+}

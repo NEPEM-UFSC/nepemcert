@@ -1,0 +1,19 @@
+{
+  "font_family": "Helvetica, Arial, sans-serif",
+  "heading_color": "#2E7D32",
+  "text_color": "#4E342E",
+  "background_color": "#F1F8E9",
+  "border_color": "#81C784",
+  "border_width": "3px",
+  "border_style": "solid",
+  "name_color": "#1B5E20",
+  "title_color": "#388E3C",
+  "event_name_color": "#43A047",
+  "link_color": "#2E7D32",
+  "title_text": "Certificado de Participação",
+  "intro_text": "Certificamos que",
+  "participation_text": "participou com êxito e ativamente na capacitação",
+  "footer_style": "modern",
+  "signature_color": "#33691E",
+  "background_image": null
+}
