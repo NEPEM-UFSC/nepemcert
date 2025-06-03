@@ -724,15 +724,15 @@ def generate_batch_certificates():
                 data_evento=data,
                 local_evento=local,
                 carga_horaria=carga_horaria
-            )
-            
-            # Gerar URL para QR Code (se aplicável)
+            )            # Gerar URL para QR Code (se aplicável)
             qrcode_url = auth_manager.gerar_qrcode_data(codigo_autenticacao)
+            url_base = "https://nepemufsc.com/verificar-certificados"
             
             # Adicionar códigos aos dados do participante
             participante_data["codigo_autenticacao"] = codigo_autenticacao
             participante_data["codigo_verificacao"] = codigo_verificacao
-            participante_data["url_verificacao"] = qrcode_url
+            participante_data["url_verificacao"] = url_base
+            participante_data["url_qrcode"] = qrcode_url
             
             # Adicionar data de emissão
             participante_data["data_emissao"] = datetime.now().strftime("%d/%m/%Y")
@@ -754,8 +754,15 @@ def generate_batch_certificates():
                 with open(temp_path, "w", encoding="utf-8") as f:
                     f.write(template_content)
                 
+                # Gerar QR code adaptado ao tamanho do placeholder no template
+                qr_info = auth_manager.gerar_qrcode_adaptado(codigo_autenticacao, template_content)
+                final_data["qrcode_base64"] = qr_info["qrcode_base64"]
+                
                 # Renderizar template com os dados
                 html_content = template_manager.render_template(temp_name, final_data)
+                
+                # Substituir o placeholder do QR code pelo QR code real
+                html_content = auth_manager.substituir_qr_placeholder(html_content, qr_info["qrcode_base64"])
                 
                 # Adicionar à lista para geração em lote
                 html_contents.append(html_content)
@@ -919,14 +926,15 @@ def test_certificate_generation():
     data = quiet_text("Data do evento (ex: 15/05/2025):", default=datetime.now().strftime("%d/%m/%Y"))
     local = quiet_text("Local do evento:")
     carga_horaria = quiet_text("Carga horária (horas):")
-    
-    # Gerar código de autenticação para o teste
+      # Gerar código de autenticação para o teste
     codigo_autenticacao = auth_manager.gerar_codigo_autenticacao(
         nome_participante=nome,
         evento=evento,
         data_evento=data
-    )
-
+    )    # O código de verificação curto foi depreciado, usando o próprio código de autenticação completo
+    codigo_verificacao = codigo_autenticacao
+    
+    url_base = "https://nepemufsc.com/verificar-certificados"
     qrcode_url = auth_manager.gerar_qrcode_data(codigo_autenticacao)
     
     # Salvar informações do certificado de teste
@@ -944,10 +952,11 @@ def test_certificate_generation():
     test_data["evento"] = evento
     test_data["data"] = data
     test_data["local"] = local
-    test_data["carga_horaria"] = carga_horaria
+    test_data["carga_horaria"] = carga_horaria    
     test_data["codigo_autenticacao"] = codigo_autenticacao
     test_data["codigo_verificacao"] = codigo_verificacao
-    test_data["url_verificacao"] = qrcode_url
+    test_data["url_verificacao"] = url_base
+    test_data["url_qrcode"] = qrcode_url
     test_data["data_emissao"] = datetime.now().strftime("%d/%m/%Y")
     
     # Solicitar valores para os demais placeholders que não foram preenchidos
@@ -969,10 +978,17 @@ def test_certificate_generation():
                 # Salvar template temporário
                 with open(temp_path, "w", encoding="utf-8") as f:
                     f.write(template_content)
+                  # Gerar QR code adaptado ao tamanho do placeholder no template
+                qr_info = auth_manager.gerar_qrcode_adaptado(codigo_autenticacao, template_content)
+                test_data["qrcode_base64"] = qr_info["qrcode_base64"]
                 
                 # Renderizar o template com os dados
                 html_content = template_manager.render_template(temp_name, test_data)
-                  # Gerar PDF
+                
+                # Substituir o placeholder do QR code pelo QR code real
+                html_content = auth_manager.substituir_qr_placeholder(html_content, qr_info["qrcode_base64"])
+                
+                # Gerar PDF
                 pdf_generator.generate_pdf(html_content, output_path, orientation='landscape')
             finally:
                 # Limpar arquivo temporário
@@ -1542,13 +1558,17 @@ def debug_compare_themes():
     evento_exemplo = "Workshop de Tecnologia e Inovação"
     data_exemplo = "15 a 17 de maio de 2025"
     
-    # Gerar código de autenticação para o exemplo
+    # Gerar código de autenticação para o exemplo    
     codigo_autenticacao_exemplo = auth_manager.gerar_codigo_autenticacao(
         nome_participante=nome_exemplo,
         evento=evento_exemplo,
         data_evento=data_exemplo
     )
-    codigo_verificacao_exemplo = "FGHUYTRE"
+    # Usa o próprio código de autenticação como código de verificação
+    codigo_verificacao_exemplo = codigo_autenticacao_exemplo
+    # Gera a URL base para verificação (sem o código)
+    url_verificacao_exemplo = "https://nepemufsc.com/verificar-certificados"
+    # Gera a URL completa para o QR code (com o código como parâmetro)
     qrcode_url_exemplo = auth_manager.gerar_qrcode_data(codigo_autenticacao_exemplo)
     
     # Dados de exemplo fixos para todos os certificados
@@ -1560,11 +1580,11 @@ def debug_compare_themes():
         "carga_horaria": "20",
         "coordenador": "Prof. Dr. Maria Fernanda Costa",
         "diretor": "Prof. Dr. Roberto Andrade Lima",
-        "cidade": "Florianópolis",
-        "data_emissao": "29 de maio de 2025",
+        "cidade": "Florianópolis",        "data_emissao": "29 de maio de 2025",
         "codigo_autenticacao": codigo_autenticacao_exemplo,
         "codigo_verificacao": codigo_verificacao_exemplo,
-        "url_verificacao": qrcode_url_exemplo,
+        "url_verificacao": url_verificacao_exemplo,
+        "url_qrcode": qrcode_url_exemplo,
         "intro_text": "Certificamos que",
         "participation_text": "participou com êxito do",
         "location_text": "realizado em",
@@ -1642,9 +1662,15 @@ def debug_compare_themes():
                     
                     with open(temp_template_path, "w", encoding="utf-8") as f:
                         f.write(template_content)
+                      # Gerar QR code adaptado ao tamanho do placeholder no template
+                    qr_info = auth_manager.gerar_qrcode_adaptado(codigo_autenticacao_exemplo, template_content)
+                    merged_data["qrcode_base64"] = qr_info["qrcode_base64"]
                     
                     # Renderizar template
                     html_content = template_manager.render_template(temp_template_name, merged_data)
+                    
+                    # Substituir o placeholder do QR code pelo QR code real
+                    html_content = auth_manager.substituir_qr_placeholder(html_content, qr_info["qrcode_base64"])
                     
                     # Aplicar tema ao HTML
                     if theme_settings:

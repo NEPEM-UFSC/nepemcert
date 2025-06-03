@@ -111,10 +111,12 @@ def generate(csv_file, template, output, zip, zip_name):
                     nome_participante=nome,
                     evento=evento,
                     data_evento=data_evento
-                )
-                  # Adicionar informações de autenticação aos dados
+                )                # Adicionar informações de autenticação aos dados
                 data['codigo_autenticacao'] = codigo_autenticacao
-                data['url_verificacao'] = "https://nepemcertificados.com/verificar-certificados/"
+                data['codigo_verificacao'] = codigo_autenticacao
+                url_base = "https://nepemufsc.com/verificar-certificados"
+                data['url_verificacao'] = url_base
+                data['url_qrcode'] = auth_manager.gerar_qrcode_data(codigo_autenticacao)
                 data['qrcode_base64'] = auth_manager.gerar_qrcode_base64(codigo_autenticacao)
 
                 # Informar sobre placeholders ainda não preenchidos
@@ -281,7 +283,8 @@ def debug_themes(template, output, zip):
         # Dados para geração de código de autenticação
         nome_exemplo = "Maria Clara Desenvolvimento"
         evento_exemplo = "Curso Avançado de Desenvolvimento de Software"
-        data_exemplo = "22 a 24 de maio de 2025"        # Gerar código de autenticação único
+        data_exemplo = "22 a 24 de maio de 2025"        
+        # Gerar código de autenticação único        
         codigo_autenticacao = auth_manager.gerar_codigo_autenticacao(
             nome_participante=nome_exemplo,
             evento=evento_exemplo,
@@ -298,9 +301,10 @@ def debug_themes(template, output, zip):
             "coordenador": "Prof. Dr. Ana Carolina Fernandes",
             "diretor": "Prof. Dr. Carlos Eduardo Martins",
             "cidade": "São Paulo",            
-            "data_emissao": "29 de maio de 2025",
-            "codigo_autenticacao": codigo_autenticacao,
-            "url_verificacao": "https://nepemufsc.com/verificar-certificados/",
+            "data_emissao": "29 de maio de 2025",            "codigo_autenticacao": codigo_autenticacao,
+            "codigo_verificacao": codigo_autenticacao,
+            "url_verificacao": "https://nepemufsc.com/verificar-certificados",
+            "url_qrcode": qrcode_url,
             "qrcode_base64": qrcode_base64,
             "intro_text": "Certificamos que",
             "participation_text": "participou com êxito do",

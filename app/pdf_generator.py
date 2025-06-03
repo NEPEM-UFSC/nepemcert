@@ -52,17 +52,32 @@ class PDFGenerator:
             
             # Definir orientação e tamanho da página
             page_size = 'A4 landscape' if orientation == 'landscape' else 'A4 portrait'
-            
-            # CSS para definir orientação da página e margens
+            # CSS para definir orientação da página, margens e garantir posicionamento correto
             css_content = f"""
                 @page {{
                     size: {page_size};
-                    margin: 2cm;
+                    margin: 0;  /* Removendo margens para evitar deslocamento */
                 }}
                 body {{
                     font-family: Arial, sans-serif;
                     margin: 0;
                     padding: 0;
+                    position: relative;
+                }}
+                /* Certificar que elementos com posição absoluta sejam renderizados corretamente */
+                .qr-placeholder {{
+                    position: absolute !important;
+                    /* Não alterar tamanho ou margem */
+                    box-sizing: border-box !important;
+                }}
+                /* Garantir que as imagens dentro dos placeholders mantenham dimensões exatas */
+                .qr-placeholder img {{
+                    width: 100% !important;
+                    height: 100% !important;
+                    display: block !important;
+                    margin: 0 !important;
+                    padding: 0 !important;
+                    object-fit: contain !important;
                 }}
             """
             
