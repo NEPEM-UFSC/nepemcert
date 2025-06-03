@@ -13,6 +13,7 @@ from slugify import slugify
 
 # Importar temas pré-definidos do módulo themes.py
 from app.themes import PREDEFINED_THEMES
+from app.utils import load_json_with_comments
 
 class ThemeManager:
     def __init__(self, themes_dir="themes"):
@@ -27,14 +28,19 @@ class ThemeManager:
         
         # Carregar temas pré-definidos do módulo themes.py
         self.predefined_themes = PREDEFINED_THEMES
-        
-        # Mapeamento de nomes de tema para arquivos
+          # Mapeamento de nomes de tema para arquivos
         self.theme_files = {
             "Acadêmico Clássico": "academico_classico.json",
             "Executivo Premium": "executivo_premium.json", 
             "Contemporâneo Elegante": "contemporaneo_elegante.json",
             "Diplomático Oficial": "diplomatico_oficial.json",
-            "Minimalista Moderno": "minimalista_moderno.json"
+            "Minimalista Moderno": "minimalista_moderno.json",
+            "Executivo Distincao": "executivo_distincao.json",
+            "Linhaca Contemporaneo": "linhaca_contemporaneo.json",
+            "Linhaca Contemporaneo Contribuição": "linhaca_contemporaneo_contribuição.json",
+            "Minimalista Neutro": "minimalista_neutro.json",
+            "Moderno Tecnológico": "moderno_tecnológico.json",
+            "Tradicional Solene": "tradicional_solene.json"
         }
         
         # Verificar se todos os temas pré-definidos têm arquivos correspondentes
@@ -76,8 +82,7 @@ class ThemeManager:
                             
                         # Transformar nome do arquivo em nome legível
                         theme_name = os.path.splitext(filename)[0].replace('_', ' ').title()
-                        
-                        # Mapear nomes conhecidos para seus nomes oficiais
+                          # Mapear nomes conhecidos para seus nomes oficiais
                         # Ex: "academico_classico.json" para "Acadêmico Clássico"
                         for official_name, file_name in self.theme_files.items():
                             if file_name == filename:
@@ -85,6 +90,22 @@ class ThemeManager:
                                 break
                                 
                         all_themes[theme_name] = theme_data
+                    except json.JSONDecodeError:
+                        # Tentar novamente com a função que suporta comentários
+                        try:
+                            theme_path = os.path.join(self.themes_dir, filename)
+                            theme_data = load_json_with_comments(theme_path)
+                            
+                            # Mapear nomes conhecidos para seus nomes oficiais
+                            theme_name = os.path.splitext(filename)[0].replace('_', ' ').title()
+                            for official_name, file_name in self.theme_files.items():
+                                if file_name == filename:
+                                    theme_name = official_name
+                                    break
+                                    
+                            all_themes[theme_name] = theme_data
+                        except Exception as e:
+                            print(f"Erro ao carregar tema {filename}: {e}")
                     except Exception as e:
                         print(f"Erro ao carregar tema {filename}: {e}")
         
@@ -126,8 +147,7 @@ class ThemeManager:
             
         Returns:
             dict: Configurações do tema ou None se o tema não existir
-        """
-        # Determinar o nome do arquivo
+        """        # Determinar o nome do arquivo
         if name in self.theme_files:
             file_name = self.theme_files[name]
         else:
@@ -137,8 +157,15 @@ class ThemeManager:
         
         # Carregar do arquivo
         if os.path.exists(theme_path):
-            with open(theme_path, "r", encoding="utf-8") as f:
-                return json.load(f)
+            try:
+                with open(theme_path, "r", encoding="utf-8") as f:
+                    return json.load(f)
+            except json.JSONDecodeError:
+                # Tentar novamente com a função que suporta comentários
+                try:
+                    return load_json_with_comments(theme_path)
+                except Exception:
+                    return None
                 
         # Se não encontrou um arquivo, verificar nos temas pré-definidos
         if name in self.predefined_themes:

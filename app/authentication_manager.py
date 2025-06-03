@@ -204,9 +204,24 @@ class AuthenticationManager:
                 with open(codigo_file, 'r', encoding='utf-8') as f:
                     return json.load(f)
             except Exception:
-                pass
-                
-        return None    @classmethod
+                pass                
+        return None
+        
+    def gerar_codigo_verificacao(self, codigo_autenticacao):
+        """
+        [DEPRECATED] Essa função está depreciada e será removida em versões futuras.
+        Use apenas o código de autenticação completo.
+        
+        Args:
+            codigo_autenticacao (str): Código de autenticação completo.
+            
+        Returns:
+            str: O mesmo código de autenticação fornecido.
+        """
+        # Função depreciada - retornando apenas o código de autenticação original
+        return codigo_autenticacao
+        
+    @classmethod
     def gerar_codigo_exemplo(cls):
         """
         Gera um exemplo de código de autenticação com dados de exemplo.

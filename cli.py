@@ -391,7 +391,7 @@ def generate_batch_certificates():
     """Gera certificados em lote."""
     console.clear()
     console.print("[bold blue]== Geração de Certificados em Lote ==[/bold blue]\n")
-      # Selecionar arquivo CSV
+    # Selecionar arquivo CSV
     csv_path = quiet_path(
         "Selecione o arquivo CSV com nomes dos participantes:",
         validate=lambda path: os.path.exists(path) and path.endswith('.csv')
@@ -400,32 +400,132 @@ def generate_batch_certificates():
     if not csv_path:
         console.print("[yellow]Operação cancelada.[/yellow]")
         return
-    
     # Verificar se o CSV tem cabeçalho
     has_header = quiet_confirm("O arquivo CSV possui linha de cabeçalho?")
-    
-    # Carregar dados do CSV
+
     with console.status("[bold green]Carregando dados do CSV..."):
         try:
-            if has_header:
-                df = pd.read_csv(csv_path)
-            else:
-                df = pd.read_csv(csv_path, header=None, names=["nome"])
+            console.print(f"[dim]Tentando carregar CSV de: {csv_path}[/dim]")
+            console.print(f"[dim]Arquivo com cabeçalho? {has_header}[/dim]")
             
-            # Verificar se o CSV tem apenas uma coluna
-            if len(df.columns) > 1:
-                console.print("[bold red]Erro:[/bold red] O arquivo CSV deve conter apenas uma coluna com os nomes dos participantes.")
-                console.print(f"Colunas encontradas: {', '.join(df.columns)}")
+            try:                # Tentativa com diferentes separadores caso o padrão falhe
+                separators = [',', ';', '\t', '|']
+                encoding_options = ['utf-8', 'latin1', 'cp1252']
+                
+                success = False
+                
+                for encoding in encoding_options:
+                    for sep in separators:
+                        try:
+                            console.print(f"[dim]Tentando ler CSV com separador '{sep}' e encoding '{encoding}'...[/dim]")
+                            
+                            if has_header:
+                                console.print("[dim]Lendo CSV com cabeçalho...[/dim]")
+                                df = pd.read_csv(csv_path, sep=sep, encoding=encoding)
+                                console.print(f"[dim]Colunas encontradas: {', '.join(df.columns)}[/dim]")
+                                
+                                # Se o arquivo tem cabeçalho, verificamos se existe a coluna "nome"
+                                if "nome" not in df.columns:
+                                    console.print("[dim]Coluna 'nome' não encontrada no cabeçalho[/dim]")
+                                    # Se não tiver a coluna nome, mas tiver apenas 1 coluna, renomear para "nome"
+                                    if len(df.columns) == 1:
+                                        console.print(f"[dim]Renomeando coluna única '{df.columns[0]}' para 'nome'[/dim]")
+                                        df.columns = ["nome"]
+                                        success = True
+                                        break
+                                else:
+                                    success = True
+                                    break
+                            else:
+                                console.print("[dim]Lendo CSV sem cabeçalho, considerando primeira coluna como 'nome'...[/dim]")
+                                # Se não tem cabeçalho, lê considerando que a primeira coluna é "nome"
+                                df = pd.read_csv(csv_path, header=None, names=["nome"], sep=sep, encoding=encoding)
+                                console.print(f"[dim]Dados carregados. Formato da tabela: {df.shape} (linhas x colunas)[/dim]")
+                                success = True
+                                break
+                        except Exception as e:
+                            console.print(f"[dim]Tentativa com separador '{sep}' e encoding '{encoding}' falhou: {str(e)}[/dim]")
+                    
+                    if success:
+                        break
+                
+                if not success:
+                    console.print("[bold red]Erro:[/bold red] Não foi possível ler o arquivo CSV em nenhum formato reconhecido.")
+                    console.print("[dim]Dica: Verifique se o arquivo está no formato CSV correto.[/dim]")
+                    return
+                
+                if has_header and "nome" not in df.columns and len(df.columns) > 1:
+                    console.print("[bold red]Erro:[/bold red] O arquivo CSV com cabeçalho deve conter uma coluna chamada 'nome'.")
+                    console.print(f"Colunas encontradas: {', '.join(df.columns)}")
+                    console.print("[dim]Dica: Se o arquivo possui apenas nomes, selecione 'Não' na opção de cabeçalho[/dim]")
+                    return
+                
+                # Mostrar os primeiros registros para debug
+                console.print("[dim]Primeiros registros carregados:[/dim]")
+                for i, row in df.head(2).iterrows():
+                    console.print(f"[dim]Registro {i+1}: {row.to_dict()}[/dim]")
+                
+                # Verificar se o arquivo tem mais informações além do nome, caso tenha apenas os nomes
+                if len(df.columns) > 1:
+                    console.print("[yellow]Aviso: O arquivo CSV contém múltiplas colunas.[/yellow]")
+                    console.print(f"Colunas encontradas: {', '.join(df.columns)}")
+                    console.print("[yellow]O sistema utilizará apenas a coluna 'nome'.[/yellow]")
+                    
+                    # Garantir que temos a coluna "nome"
+                    if "nome" not in df.columns:
+                        console.print("[bold red]Erro:[/bold red] Não foi encontrada uma coluna 'nome' no arquivo.")
+                        console.print("[dim]Colunas disponíveis:[/dim]")
+                        for i, col in enumerate(df.columns):
+                            console.print(f"[dim]  {i+1}. {col}[/dim]")
+                        return
+                
+            except pd.errors.EmptyDataError:
+                console.print("[bold red]Erro:[/bold red] O arquivo CSV está vazio.")
                 return
+            except pd.errors.ParserError as e:
+                console.print(f"[bold red]Erro de formatação no CSV:[/bold red] {str(e)}")
+                console.print("[dim]Dica: Verifique se o arquivo está no formato CSV correto, sem erros de sintaxe.[/dim]")
+                return
+              # Verificar valores nulos
+            if df["nome"].isna().any():
+                null_count = df["nome"].isna().sum()
+                console.print(f"[yellow]Aviso: Existem {null_count} valores vazios na coluna 'nome'.[/yellow]")
+                console.print("[dim]Estes registros serão ignorados ou podem gerar certificados com nomes em branco.[/dim]")
             
-            # Garantir que a coluna se chame "nome" para compatibilidade
-            if df.columns[0] != "nome":
-                df.columns = ["nome"]
+            # Remover valores nulos para contagem correta
+            df = df.dropna(subset=["nome"])
             
             num_records = len(df)
+            
+            if num_records == 0:
+                console.print("[bold red]Erro:[/bold red] Não foram encontrados participantes válidos no arquivo.")
+                return
+            
             console.print(f"[green]✓[/green] Dados carregados com sucesso. {num_records} participantes encontrados.")
+            
+            # Exibir uma prévia dos nomes carregados
+            preview_limit = min(5, num_records)
+            console.print(f"\n[bold]Prévia dos primeiros {preview_limit} participantes:[/bold]")
+            for i, nome in enumerate(df["nome"].head(preview_limit)):
+                console.print(f"  {i+1}. {nome}")
+
+        except pd.errors.UnicodeDecodeError:
+            console.print("[bold red]Erro de codificação:[/bold red] O arquivo não está em formato UTF-8.")
+            console.print("[dim]Dica: Salve seu arquivo CSV com codificação UTF-8.[/dim]")
+            return
+        except FileNotFoundError:
+            console.print(f"[bold red]Erro:[/bold red] O arquivo {csv_path} não foi encontrado.")
+            return
+        except PermissionError:
+            console.print("[bold red]Erro de permissão:[/bold red] Não foi possível acessar o arquivo.")
+            console.print("[dim]Dica: Verifique se o arquivo está sendo usado por outro programa.[/dim]")
+            return
         except Exception as e:
             console.print(f"[bold red]Erro ao carregar CSV:[/bold red] {str(e)}")
+            console.print(f"[bold yellow]Tipo de erro:[/bold yellow] {type(e).__name__}")
+            console.print("[dim]Stack trace para referência:[/dim]")
+            import traceback
+            console.print(f"[dim]{traceback.format_exc()}[/dim]")
             return
     
     # Solicitar informações do evento
@@ -612,9 +712,9 @@ def generate_batch_certificates():
                 evento=evento,
                 data_evento=data
             )
-            
-            # Gerar código de verificação mais curto para exibição
-            codigo_verificacao = auth_manager.gerar_codigo_verificacao(codigo_autenticacao)
+            # NOTA: O código de verificação curto foi depreciado
+            # Usamos o próprio código de autenticação como código de verificação
+            codigo_verificacao = codigo_autenticacao
             
             # Salvar informações do certificado
             auth_manager.salvar_codigo(
@@ -698,6 +798,20 @@ def generate_batch_certificates():
     
     except Exception as e:
         console.print(f"[bold red]Erro ao gerar certificados:[/bold red] {str(e)}")
+        console.print(f"[bold yellow]Tipo de erro:[/bold yellow] {type(e).__name__}")
+        
+        # Informações de diagnóstico
+        console.print("\n[bold]Informações de diagnóstico:[/bold]")
+        console.print(f"- Arquivo CSV: {csv_path}")
+        console.print(f"- Template: {template_name}")
+        console.print(f"- Tema aplicado: {selected_theme}")
+        console.print(f"- Número de participantes: {num_records}")
+        console.print(f"- Diretório de saída: {output_dir}")
+        
+        # Exibir stack trace para referência técnica
+        console.print("\n[dim]Stack trace para diagnóstico técnico:[/dim]")
+        import traceback
+        console.print(f"[dim]{traceback.format_exc()}[/dim]")
     
     console.print("\n[dim]Pressione Enter para voltar ao menu...[/dim]")
     input()
@@ -812,7 +926,7 @@ def test_certificate_generation():
         evento=evento,
         data_evento=data
     )
-    codigo_verificacao = auth_manager.gerar_codigo_verificacao(codigo_autenticacao)
+
     qrcode_url = auth_manager.gerar_qrcode_data(codigo_autenticacao)
     
     # Salvar informações do certificado de teste
@@ -1434,7 +1548,7 @@ def debug_compare_themes():
         evento=evento_exemplo,
         data_evento=data_exemplo
     )
-    codigo_verificacao_exemplo = auth_manager.gerar_codigo_verificacao(codigo_autenticacao_exemplo)
+    codigo_verificacao_exemplo = "FGHUYTRE"
     qrcode_url_exemplo = auth_manager.gerar_qrcode_data(codigo_autenticacao_exemplo)
     
     # Dados de exemplo fixos para todos os certificados
