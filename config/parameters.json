@@ -59,5 +59,8 @@
         "diretor": "Fulano da Silva",
         "cidade": "Florianópolis, SC",
         "url_verificacao": "https://nepemufsc.com/verificar-certificado/"
+    },
+    "system_settings": {
+        "debug_mode": false
     }
 }
