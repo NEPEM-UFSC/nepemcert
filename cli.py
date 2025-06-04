@@ -5,6 +5,7 @@ Ferramenta para geração de certificados em lote.
 
 import os
 import sys
+import random
 
 # Suprimir avisos verbosos do GLib no Windows
 os.environ['G_MESSAGES_DEBUG'] = ''
@@ -20,7 +21,7 @@ import typer
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
-from rich.progress import Progress, SpinnerColumn, TextColumn
+from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn
 from rich.markdown import Markdown
 from rich.syntax import Syntax
 from rich import box
@@ -1508,6 +1509,15 @@ def configure_credentials():
 # Função principal do aplicativo
 def main():
     """Função principal que inicializa o aplicativo."""
+    # Exibe a tela de carregamento antes de iniciar
+    try:
+        from app.loading_screen import loading_dummy
+        loading_dummy(4.0)  # Exibir por 4 segundos (só será exibido uma vez)
+    except ImportError:
+        # Se não conseguir importar a tela de carregamento, continua normalmente
+        console.print("[yellow]Aviso: Módulo de carregamento não encontrado.[/yellow]")
+    
+    # Continuar com o menu principal após o carregamento
     while main_menu():
         pass
 

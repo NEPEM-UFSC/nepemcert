@@ -404,5 +404,13 @@ if __name__ == "__main__":
         # Exibir ajuda normal do Click
         cli(["--help"])
     else:
+        # Tenta exibir a tela de carregamento dummy antes de iniciar
+        try:
+            from app.loading_screen import loading_dummy
+            loading_dummy(4.0)  # Exibe por 4 segundos (só será exibido uma vez)
+        except ImportError:
+            # Se não conseguir importar, continua normalmente
+            console.print("[yellow]Aviso: Módulo de carregamento não encontrado.[/yellow]")
+        
         # Se não for solicitação de ajuda, executar normalmente
         cli()
