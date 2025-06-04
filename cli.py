@@ -7,6 +7,8 @@ import os
 import sys
 import random
 
+from app import themes
+
 # Suprimir avisos verbosos do GLib no Windows
 os.environ['G_MESSAGES_DEBUG'] = ''
 os.environ['GLIB_SILENCE_DEPRECATION'] = '1'
@@ -175,25 +177,40 @@ def print_header():
     # Reduz espaço entre painéis e menu
     console.print("\n[bold cyan]Gerador de Certificados em Lote[/bold cyan]")
     console.print("[dim]Use os comandos abaixo para gerenciar seus certificados.[/dim]")
+    
+    # Exibir indicador de modo debug no rodapé quando estiver ativado
+    if parameter_manager.get_debug_mode():
+        console.print("\n[bold red]🐛 [DEBUG MODE ATIVADO] 🐛[/bold red]")
 
 
 def main_menu():
     """Exibe o menu principal da aplicação."""
     print_header()
+    
+    # Lista básica de opções do menu
+    menu_options = [
+        "🔖 Gerar Certificados",
+        "🎨 Gerenciar Templates",
+        "⚙️ Configurações",
+        "🔄 Sincronização e Conectividade",
+        "❓ Ajuda",
+        "🚪 Sair"
+    ]
+    
+    # Adicionar opções de debug se o modo debug estiver ativado
+    debug_mode = parameter_manager.get_debug_mode()
+    if debug_mode:
+        # Inserir as opções de debug antes da Ajuda
+        menu_options.insert(-2, "🐛 DEBUG: Comparar temas")
+        menu_options.insert(-2, "🐛 DEBUG: Verificar sistema")
+    
     choice = quiet_select(
         "Selecione uma opção:",
-        choices=[
-            "🔖 Gerar Certificados",
-            "🎨 Gerenciar Templates",
-            "⚙️ Configurações",
-            "🔄 Sincronização e Conectividade",
-            "🐛 DEBUG: Comparar temas",
-            "❓ Ajuda",
-            "🚪 Sair"
-        ],
+        choices=menu_options,
         use_indicator=True,
         style=get_menu_style()
     )
+    
     if choice == "🔖 Gerar Certificados":
         generate_certificates_menu()
     elif choice == "🎨 Gerenciar Templates":
@@ -204,6 +221,8 @@ def main_menu():
         connectivity_menu()
     elif choice == "🐛 DEBUG: Comparar temas":
         debug_compare_themes()
+    elif choice == "🐛 DEBUG: Verificar sistema":
+        debug_system_check()
     elif choice == "❓ Ajuda":
         show_help()
     elif choice == "🚪 Sair":
@@ -215,181 +234,6 @@ def main_menu():
 
 def generate_certificates_menu():
     """Menu para geração de certificados."""
-    console.clear()
-    console.print("[bold blue]== Geração de Certificados em Lote ==[/bold blue]\n")
-    choice = quiet_select(
-        "O que você deseja fazer?",
-        choices=[
-            "📄 Gerar certificados em lote",
-            "📋 Visualizar dados importados",
-            "🔍 Testar geração com um único registro",
-            "🔐 Verificar código de autenticação",
-            "↩️ Voltar ao menu principal"
-        ],
-        style=get_menu_style()
-    )
-    
-    if choice == "📄 Gerar certificados em lote":
-        generate_batch_certificates()
-    elif choice == "📋 Visualizar dados importados":
-        preview_imported_data()
-    elif choice == "🔍 Testar geração com um único registro":
-        test_certificate_generation()
-    elif choice == "🔐 Verificar código de autenticação":
-        verify_authentication_code()
-    elif choice == "↩️ Voltar ao menu principal":
-        return
-
-
-def manage_templates_menu():
-    """Menu para gerenciamento de templates."""
-    console.clear()
-    console.print("[bold blue]== Gerenciamento de Templates ==[/bold blue]\n")
-    
-    choice = quiet_select(
-        "O que você deseja fazer?",
-        choices=[
-            "📝 Listar templates disponíveis",
-            "➕ Importar novo template",
-            "🖌️ Editar template existente",
-            "🗑️ Excluir template",
-            "👁️ Visualizar template",
-            "↩️ Voltar ao menu principal"
-        ],
-        style=get_menu_style()
-    )
-    
-    if choice == "📝 Listar templates disponíveis":
-        list_templates()
-    elif choice == "➕ Importar novo template":
-        import_template()
-    elif choice == "🖌️ Editar template existente":
-        edit_template()
-    elif choice == "🗑️ Excluir template":
-        delete_template()
-    elif choice == "👁️ Visualizar template":
-        preview_template()
-    elif choice == "↩️ Voltar ao menu principal":
-        return
-
-
-def settings_menu():
-    """Menu de configurações."""
-    console.clear()
-    console.print("[bold blue]== Configurações ==[/bold blue]\n")
-    
-    choice = quiet_select(
-        "O que você deseja configurar?",
-        choices=[
-            "📁 Diretórios de trabalho",
-            "🎨 Aparência e tema",
-            "📊 Parâmetros de geração",
-            "💾 Salvar/carregar presets",
-            "↩️ Voltar ao menu principal"
-        ],
-        style=get_menu_style()
-    )
-    
-    if choice == "📁 Diretórios de trabalho":
-        configure_directories()
-    elif choice == "🎨 Aparência e tema":
-        configure_appearance()
-    elif choice == "📊 Parâmetros de geração":
-        configure_generation_parameters()
-    elif choice == "💾 Salvar/carregar presets":
-        manage_presets()
-    elif choice == "↩️ Voltar ao menu principal":
-        return
-
-
-def connectivity_menu():
-    """Menu de conectividade e sincronização."""
-    console.clear()
-    console.print("[bold blue]== Sincronização e Conectividade ==[/bold blue]\n")
-    
-    choice = quiet_select(
-        "O que você deseja fazer?",
-        choices=[
-            "🔄 Verificar status da conexão",
-            "📡 Configurar servidor remoto",
-            "⬆️ Enviar certificados para servidor",
-            "⬇️ Baixar templates do servidor",
-            "🔒 Configurar credenciais",
-            "↩️ Voltar ao menu principal"
-        ],
-        style=get_menu_style()
-    )
-    
-    if choice == "🔄 Verificar status da conexão":
-        check_connection()
-    elif choice == "📡 Configurar servidor remoto":
-        configure_remote_server()
-    elif choice == "⬆️ Enviar certificados para servidor":
-        upload_certificates()
-    elif choice == "⬇️ Baixar templates do servidor":
-        download_templates()
-    elif choice == "🔒 Configurar credenciais":
-        configure_credentials()
-    elif choice == "↩️ Voltar ao menu principal":
-        return
-
-
-def show_help():
-    """Exibe informações de ajuda."""
-    console.clear()
-    
-    help_text = """
-    # Ajuda do NEPEM Cert
-    
-    ## Como usar
-    
-    O NEPEM Cert é uma ferramenta para geração de certificados em lote. Você pode:
-    
-    1. **Gerar Certificados em Lote**:
-       - Importe um CSV com os nomes dos participantes
-       - Forneça detalhes do evento (nome, data, local, carga horária)
-       - Selecione um template HTML
-       - Gere os certificados com códigos de verificação únicos
-    
-    2. **Gerenciar Templates**:
-       - Crie, edite e visualize templates HTML
-       - Use placeholders para campos dinâmicos
-    
-    3. **Configurações**:
-       - Defina diretórios de trabalho
-       - Configure parâmetros de geração
-    
-    4. **Conectividade**:
-       - Sincronize com servidor remoto
-       - Importe/exporte templates e certificados
-    
-    ## Contato e Suporte
-    
-    Para mais informações ou suporte, entre em contato:
-    - Email: contato@nepem.com
-    - Site: www.nepem.com
-    """
-    
-    md = Markdown(help_text)
-    console.print(md)
-    console.print("\n[dim]Pressione Enter para voltar ao menu principal...[/dim]")
-    input()
-
-
-def get_menu_style():
-    """Retorna o estilo padrão para menus de questionary."""
-    return questionary.Style([
-        ('selected', 'bg:#0066cc #ffffff bold'),
-        ('highlighted', 'fg:#0066cc bold'),
-        ('instruction', 'fg:#0A1128'),
-        ('pointer', 'fg:#0066cc bold'),
-        ('answer', 'fg:#0066cc bold'),
-    ])
-
-
-# Função de geração de certificados implementada conforme o fluxo solicitado
-def generate_batch_certificates():
-    """Gera certificados em lote."""
     console.clear()
     console.print("[bold blue]== Geração de Certificados em Lote ==[/bold blue]\n")
     # Selecionar arquivo CSV
@@ -1706,12 +1550,14 @@ def debug_compare_themes():
                         os.remove(temp_template_path)
                         
             except Exception as e:
-                console.print(f"[red]❌ Erro geral no tema '{theme_name}': {str(e)}[/red]")
+                console.print(f"[red]❌ Erro geral no tema '{theme_name}': {str(e)}[/red")
     
     # Relatório final
     console.print(f"\n[bold green]🎉 Geração concluída![/bold green]")
-    console.print(f"[green]✓ {len(generated_files)} certificados gerados com sucesso[/green]")
-    console.print(f"[green]✓ Arquivos salvos em: {debug_output_dir}[/green]\n")
+    console.print(f"[green]✓[/green] Sistema operacional: {sys.platform.system()}")
+    console.print(f"[green]✓[/green] Versão do aplicativo: {APP_VERSION}")
+    console.print(f"[{'green' if templates else 'yellow'}]{'✓' if templates else '⚠️'}[/{'green' if templates else 'yellow'}] Templates: {len(templates) if templates else 0}")
+    console.print(f"[{'green' if themes else 'yellow'}]{'✓' if themes else '⚠️'}[/{'green' if themes else 'yellow'}] Temas: {len(themes) if themes else 0}")
     
     if generated_files:
         # Mostrar lista dos arquivos gerados
@@ -1845,3 +1691,382 @@ def verify_authentication_code():
     
     console.print("\n[dim]Pressione Enter para voltar ao menu...[/dim]")
     input()
+
+def get_menu_style():
+    """Retorna o estilo padrão para menus do questionary."""
+    from questionary import Style
+    
+    return Style([
+        ('qmark', 'fg:#ff9d00 bold'),
+        ('question', 'bold'),
+        ('answer', 'fg:#ff9d00 bold'),
+        ('pointer', 'fg:#ff9d00 bold'),
+        ('highlighted', 'fg:#ff9d00 bold'),
+        ('selected', 'fg:#cc5454'),
+        ('separator', 'fg:#cc5454'),
+        ('instruction', ''),
+        ('text', ''),
+        ('disabled', 'fg:#858585 italic')
+    ])
+
+
+def settings_menu():
+    """Menu de configurações."""
+    console.clear()
+    console.print("[bold blue]== Configurações ==[/bold blue]\n")
+    
+    choice = quiet_select(
+        "O que você deseja configurar?",
+        choices=[
+            "📁 Diretórios de trabalho",
+            "🎨 Aparência e tema",
+            "📊 Parâmetros de geração",
+            "🔧 Configurações do sistema",
+            "💾 Salvar/carregar presets",
+            "↩️ Voltar ao menu principal"
+        ],
+        style=get_menu_style()
+    )
+    
+    if choice == "📁 Diretórios de trabalho":
+        configure_directories()
+    elif choice == "🎨 Aparência e tema":
+        configure_appearance()
+    elif choice == "📊 Parâmetros de geração":
+        configure_generation_parameters()
+    elif choice == "🔧 Configurações do sistema":
+        configure_system_settings()
+    elif choice == "💾 Salvar/carregar presets":
+        manage_presets()
+    elif choice == "↩️ Voltar ao menu principal":
+        return
+
+
+def configure_system_settings():
+    """Configurações gerais do sistema."""
+    console.clear()
+    console.print("[bold blue]== Configurações do Sistema ==[/bold blue]\n")
+    
+    # Verificar status atual do modo debug
+    debug_mode = parameter_manager.get_debug_mode()
+    debug_status = "[green]ATIVADO[/green]" if debug_mode else "[red]DESATIVADO[/red]"
+    
+    console.print(f"[bold]Status atual do modo DEBUG:[/bold] {debug_status}\n")
+    console.print("[dim]O modo DEBUG exibe opções e informações adicionais para desenvolvedores e diagnóstico.[/dim]")
+    console.print("[dim]Ativar este modo pode expor informações técnicas e funções experimentais.[/dim]\n")
+    
+    # Opções disponíveis para configurações do sistema
+    choice = quiet_select(
+        "O que você deseja configurar?",
+        choices=[
+            f"{'Desativar' if debug_mode else 'Ativar'} modo DEBUG",
+            "↩️ Voltar"
+        ],
+        style=get_menu_style()
+    )
+    
+    if choice == "Ativar modo DEBUG" or choice == "Desativar modo DEBUG":
+        new_status = not debug_mode
+        confirm_msg = "Tem certeza que deseja ATIVAR o modo DEBUG?" if new_status else "Tem certeza que deseja DESATIVAR o modo DEBUG?"
+        
+        confirm = quiet_confirm(confirm_msg)
+        if confirm:
+            result = parameter_manager.set_debug_mode(new_status)
+            if result:
+                status_msg = "[green]✓ Modo DEBUG ATIVADO com sucesso![/green]" if new_status else "[yellow]✓ Modo DEBUG DESATIVADO![/yellow]"
+                console.print(status_msg)
+                console.print("[dim]Esta configuração será mantida entre sessões do programa.[/dim]")
+                
+                if new_status:
+                    console.print("\n[yellow]Atenção: Funções de DEBUG agora estão visíveis no menu principal.[/yellow]")
+                    console.print("[yellow]Estas incluem:[/yellow]")
+                    console.print("[dim]  • DEBUG: Comparar temas[/dim]")
+                    console.print("[dim]  • DEBUG: Verificar sistema[/dim]")
+            else:
+                console.print("[bold red]Erro ao salvar configuração![/bold red]")
+        
+        # Mostrar novamente o menu de configurações do sistema
+        console.print("\n[dim]Pressione Enter para continuar...[/dim]")
+        input()
+        configure_system_settings()
+    
+    elif choice == "↩️ Voltar":
+        settings_menu()
+
+
+def debug_system_check():
+    """Função de debug para verificar o sistema."""
+    console.clear()
+    console.print("[bold red]== DEBUG: Verificação do Sistema ==[/bold red]\n")
+    
+    console.print("[yellow]Esta ferramenta verifica o estado geral do sistema NEPEM Cert.[/yellow]\n")
+    
+    # Verificar diretórios essenciais
+    console.print("[bold]📁 Verificando diretórios essenciais...[/bold]")
+    
+    directories = {
+        "Templates": "templates",
+        "Output": "output", 
+        "Config": "config",
+        "App": "app"
+    }
+    
+    for name, path in directories.items():
+        if os.path.exists(path):
+            console.print(f"[green]✓[/green] {name}: {path}")
+        else:
+            console.print(f"[red]❌[/red] {name}: {path} [red](não encontrado)[/red]")
+            try:
+                os.makedirs(path, exist_ok=True)
+                console.print(f"[yellow]  → Diretório criado automaticamente[/yellow]")
+            except Exception as e:
+                console.print(f"[red]  → Erro ao criar: {str(e)}[/red]")
+    
+    # Verificar templates disponíveis
+    console.print(f"\n[bold]📄 Verificando templates...[/bold]")
+    templates = template_manager.list_templates()
+    if templates:
+        console.print(f"[green]✓[/green] {len(templates)} template(s) encontrado(s):")
+        for template in templates[:5]:  # Mostrar apenas os primeiros 5
+            console.print(f"[dim]  • {template}[/dim]")
+        if len(templates) > 5:
+            console.print(f"[dim]  ... e mais {len(templates) - 5} template(s)[/dim]")
+    else:
+        console.print("[yellow]⚠️[/yellow] Nenhum template encontrado")
+    
+    # Verificar temas disponíveis
+    console.print(f"\n[bold]🎨 Verificando temas...[/bold]")
+    themes = theme_manager.list_themes()
+    if themes:
+        console.print(f"[green]✓[/green] {len(themes)} tema(s) encontrado(s):")
+        for theme in themes:
+            console.print(f"[dim]  • {theme}[/dim]")
+    else:
+        console.print("[yellow]⚠️[/yellow] Nenhum tema encontrado")
+    
+    # Verificar configurações de parâmetros
+    console.print(f"\n[bold]⚙️ Verificando configurações...[/bold]")
+    try:
+        institutional = parameter_manager.get_institutional_placeholders()
+        defaults = parameter_manager.get_default_placeholders()
+        
+        console.print(f"[green]✓[/green] Parâmetros institucionais: {len(institutional)} configurado(s)")
+        console.print(f"[green]✓[/green] Parâmetros padrão: {len(defaults)} configurado(s)")
+        
+        # Verificar arquivo de configuração
+        config_path = parameter_manager.config_file
+        if os.path.exists(config_path):
+            size = os.path.getsize(config_path)
+            console.print(f"[green]✓[/green] Arquivo de configuração: {config_path} ({size} bytes)")
+        else:
+            console.print(f"[yellow]⚠️[/yellow] Arquivo de configuração não encontrado: {config_path}")
+            
+    except Exception as e:
+        console.print(f"[red]❌[/red] Erro ao verificar configurações: {str(e)}")
+    
+    # Verificar conectividade
+    console.print(f"\n[bold]🌐 Verificando conectividade...[/bold]")
+    try:
+        conn_info = connectivity_manager.get_connection_status()
+        status_color = {
+            "Conectado": "green",
+            "Desconectado": "red", 
+            "Aguardando": "yellow"
+        }.get(conn_info["status"], "yellow")
+        
+        console.print(f"[{status_color}]●[/{status_color}] Status: {conn_info['status']}")
+        if "last_check" in conn_info:
+            console.print(f"[dim]  Última verificação: {conn_info['last_check']}[/dim]")
+            
+    except Exception as e:
+        console.print(f"[red]❌[/red] Erro ao verificar conectividade: {str(e)}")
+    
+    # Verificar dependências do sistema
+    console.print(f"\n[bold]📦 Verificando dependências...[/bold]")
+    
+    dependencies = [
+        ("pandas", "Processamento de CSV"),
+        ("rich", "Interface de usuário"),
+        ("questionary", "Menus interativos"),
+        ("jinja2", "Templates"),
+        ("xhtml2pdf", "Geração de PDF"),
+        ("qrcode", "Códigos QR"),
+        ("PIL", "Processamento de imagens")
+    ]
+    
+    for module_name, description in dependencies:
+        try:
+            __import__(module_name)
+            console.print(f"[green]✓[/green] {module_name}: {description}")
+        except ImportError:
+            console.print(f"[red]❌[/red] {module_name}: {description} [red](não encontrado)[/red]")
+    
+    # Informações do sistema
+    console.print(f"\n[bold]💻 Informações do sistema...[/bold]")
+    import platform
+    console.print(f"[cyan]Python:[/cyan] {platform.python_version()}")
+    console.print(f"[cyan]Sistema:[/cyan] {platform.system()} {platform.release()}")
+    console.print(f"[cyan]Arquitetura:[/cyan] {platform.machine()}")
+    
+    # Resumo final
+    console.print(f"\n[bold blue]📊 Resumo da verificação:[/bold blue]")
+    console.print(f"[green]✓[/green] Sistema operacional: {platform.system()}")
+    console.print(f"[green]✓[/green] Versão do aplicativo: {APP_VERSION}")
+    console.print(f"[{'green' if templates else 'yellow'}]{'✓' if templates else '⚠️'}[/{'green' if templates else 'yellow'}] Templates: {len(templates) if templates else 0}")
+    console.print(f"[{'green' if themes else 'yellow'}]{'✓' if themes else '⚠️'}[/{'green' if themes else 'yellow'}] Temas: {len(themes) if themes else 0}")
+    
+    console.print("\n[dim]Esta verificação ajuda a identificar problemas de configuração e dependências.[/dim]")
+    console.print("[dim]Pressione Enter para voltar ao menu...[/dim]")
+    input()
+
+
+def manage_templates_menu():
+    """Menu para gerenciamento de templates."""
+    console.clear()
+    console.print("[bold blue]== Gerenciamento de Templates ==[/bold blue]\n")
+    
+    choice = quiet_select(
+        "O que você deseja fazer?",
+        choices=[
+            "📄 Listar templates",
+            "📥 Importar template",
+            "✏️ Editar template",
+            "🗑️ Excluir template",
+            "👁️ Visualizar template",
+            "🧪 Testar geração de certificado",
+            "📊 Visualizar dados CSV",
+            "↩️ Voltar ao menu principal"
+        ],
+        style=get_menu_style()
+    )
+    
+    if choice == "📄 Listar templates":
+        list_templates()
+    elif choice == "📥 Importar template":
+        import_template()
+    elif choice == "✏️ Editar template":
+        edit_template()
+    elif choice == "🗑️ Excluir template":
+        delete_template()
+    elif choice == "👁️ Visualizar template":
+        preview_template()
+    elif choice == "🧪 Testar geração de certificado":
+        test_certificate_generation()
+    elif choice == "📊 Visualizar dados CSV":
+        preview_imported_data()
+    elif choice == "↩️ Voltar ao menu principal":
+        return
+    
+    # Retornar ao menu de templates após cada operação
+    manage_templates_menu()
+
+
+def connectivity_menu():
+    """Menu de conectividade e sincronização."""
+    console.clear()
+    console.print("[bold blue]== Sincronização e Conectividade ==[/bold blue]\n")
+    
+    # Verificar status da conexão
+    status_info = connectivity_manager.get_connection_status()
+    status_color = {
+        "Conectado": "green",
+        "Desconectado": "red",
+        "Aguardando": "yellow"
+    }.get(status_info["status"], "yellow")
+    
+    console.print(f"[bold]Status atual:[/bold] [{status_color}]{status_info['status']}[/{status_color}]")
+    console.print(f"[bold]Última verificação:[/bold] {status_info.get('last_check', 'Nunca')}")
+    
+    choice = quiet_select(
+        "O que você deseja fazer?",
+        choices=[
+            "🔄 Verificar conexão",
+            "⚙️ Configurar servidor",
+            "📤 Sincronizar dados",
+            "📋 Histórico de sincronização",
+            "↩️ Voltar ao menu principal"
+        ],
+        style=get_menu_style()
+    )
+    
+    if choice == "🔄 Verificar conexão":
+        with console.status("[bold green]Verificando conexão..."):
+            result = connectivity_manager.test_connection()
+        
+        if result["success"]:
+            console.print("[bold green]✓ Conexão bem-sucedida![/bold green]")
+        else:
+            console.print(f"[bold red]✗ Falha na conexão:[/bold red] {result.get('error', 'Erro desconhecido')}")
+        
+        input("\nPressione Enter para continuar...")
+        connectivity_menu()
+    
+    elif choice == "⚙️ Configurar servidor":
+        console.print("[yellow]Função ainda não implementada.[/yellow]")
+        input("\nPressione Enter para voltar...")
+        connectivity_menu()
+    
+    elif choice == "📤 Sincronizar dados":
+        console.print("[yellow]Função ainda não implementada.[/yellow]")
+        input("\nPressione Enter para voltar...")
+        connectivity_menu()
+    
+    elif choice == "📋 Histórico de sincronização":
+        console.print("[yellow]Função ainda não implementada.[/yellow]")
+        input("\nPressione Enter para voltar...")
+        connectivity_menu()
+    
+    elif choice == "↩️ Voltar ao menu principal":
+        return
+
+
+def show_help():
+    """Exibe a ajuda do sistema."""
+    console.clear()
+    console.print("[bold blue]== Ajuda do NEPEM Cert ==[/bold blue]\n")
+    
+    help_content = """
+[bold]NEPEM Cert - Gerador de Certificados em Lote[/bold]
+
+[bold cyan]Funcionalidades Principais:[/bold cyan]
+• [green]Geração de Certificados:[/green] Crie certificados em lote a partir de templates HTML e dados CSV
+• [green]Gerenciamento de Templates:[/green] Importe, edite e gerencie templates de certificados
+• [green]Temas Personalizados:[/green] Aplique diferentes estilos visuais aos seus certificados
+• [green]Configurações Flexíveis:[/green] Configure valores padrão, institucionais e específicos por tema
+
+[bold cyan]Como Usar:[/bold cyan]
+1. [yellow]Prepare seu arquivo CSV[/yellow] com uma coluna contendo os nomes dos participantes
+2. [yellow]Importe um template HTML[/yellow] ou use um dos templates existentes
+3. [yellow]Configure os parâmetros[/yellow] institucionais e valores padrão
+4. [yellow]Gere os certificados[/yellow] informando os dados do evento
+
+[bold cyan]Formatos Suportados:[/bold cyan]
+• [green]Templates:[/green] Arquivos HTML com placeholders no formato {{ placeholder }}
+• [green]Dados:[/green] Arquivos CSV com encoding UTF-8
+• [green]Saída:[/green] Certificados em PDF e opcionalmente empacotados em ZIP
+
+[bold cyan]Placeholders Disponíveis:[/bold cyan]
+• {{ nome }} - Nome do participante
+• {{ evento }} - Nome do evento
+• {{ data }} - Data do evento
+• {{ local }} - Local do evento
+• {{ carga_horaria }} - Carga horária do evento
+• {{ codigo_autenticacao }} - Código único de autenticação
+• {{ codigo_verificacao }} - Código de verificação
+• {{ data_emissao }} - Data de emissão do certificado
+
+[bold cyan]Dicas Importantes:[/bold cyan]
+• Use encoding UTF-8 nos arquivos CSV para evitar problemas com acentos
+• Templates HTML devem ser compatíveis com a biblioteca de geração de PDF
+• Evite elementos CSS complexos como flexbox ou posicionamento absoluto
+• Configure valores institucionais para reutilizar informações comuns
+
+[bold cyan]Suporte:[/bold cyan]
+• Versão atual: v1.1.0
+• Para problemas técnicos, ative o modo DEBUG nas configurações
+• Templates de exemplo estão disponíveis na pasta 'templates'
+"""
+    
+    console.print(help_content)
+    
+    input("\n[dim]Pressione Enter para voltar ao menu principal...[/dim]")
