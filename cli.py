@@ -1554,7 +1554,6 @@ def debug_compare_themes():
     
     # Relatório final
     console.print(f"\n[bold green]🎉 Geração concluída![/bold green]")
-    console.print(f"[green]✓[/green] Sistema operacional: {sys.platform.system()}")
     console.print(f"[green]✓[/green] Versão do aplicativo: {APP_VERSION}")
     console.print(f"[{'green' if templates else 'yellow'}]{'✓' if templates else '⚠️'}[/{'green' if templates else 'yellow'}] Templates: {len(templates) if templates else 0}")
     console.print(f"[{'green' if themes else 'yellow'}]{'✓' if themes else '⚠️'}[/{'green' if themes else 'yellow'}] Temas: {len(themes) if themes else 0}")
