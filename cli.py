@@ -1556,7 +1556,8 @@ def debug_compare_themes():
     console.print(f"\n[bold green]🎉 Geração concluída![/bold green]")
     console.print(f"[green]✓[/green] Versão do aplicativo: {APP_VERSION}")
     console.print(f"[{'green' if templates else 'yellow'}]{'✓' if templates else '⚠️'}[/{'green' if templates else 'yellow'}] Templates: {len(templates) if templates else 0}")
-    console.print(f"[{'green' if themes else 'yellow'}]{'✓' if themes else '⚠️'}[/{'green' if themes else 'yellow'}] Temas: {len(themes) if themes else 0}")
+    available_themes = theme_manager.list_themes()
+    console.print(f"[{'green' if available_themes else 'yellow'}]{'✓' if available_themes else '⚠️'}[/{'green' if available_themes else 'yellow'}] Temas: {len(available_themes) if available_themes else 0}")
     
     if generated_files:
         # Mostrar lista dos arquivos gerados
