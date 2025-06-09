@@ -46,13 +46,12 @@ def generate(csv_file, template, output, zip, zip_name):
     
     CSV_FILE: Caminho para o arquivo CSV com os dados dos participantes.
     TEMPLATE: Caminho para o arquivo de template HTML.
-    """    # Importações necessárias
+    """
+    # Importações necessárias
     import pandas as pd
-    from app.pdf_generator import PDFGenerator
+    from app.certificate_service import CertificateService # Import CertificateService
     from app.zip_exporter import ZipExporter
-    from app.parameter_manager import ParameterManager
-    from app.template_manager import TemplateManager
-    from app.theme_manager import ThemeManager
+    from app.template_manager import TemplateManager as GlobalTemplateManager # Alias for local instance
     
     console.print(f"[bold blue]Gerando certificados...[/bold blue]")
     console.print(f"- Arquivo CSV: [cyan]{csv_file}[/cyan]")
@@ -63,129 +62,113 @@ def generate(csv_file, template, output, zip, zip_name):
         # Criar diretório de saída se não existir
         os.makedirs(output, exist_ok=True)
         
-        # Carregar dados do CSV
-        df = pd.read_csv(csv_file)
-        console.print(f"[green]✓[/green] Dados carregados: {len(df)} registros")
-        
-        # Carregar template
-        with open(template, 'r', encoding='utf-8') as f:
-            template_content = f.read()
-        console.print(f"[green]✓[/green] Template carregado")
-        
-        # Inicializar geradores
-        pdf_generator = PDFGenerator(output_dir=output)
+        # Instantiate CertificateService
+        certificate_service = CertificateService(output_dir=output)
+        # ZipExporter is still needed for zipping after generation
         zip_exporter = ZipExporter()
-          # Inicializar gerenciadores adicionais
-        parameter_manager = ParameterManager()
-        template_manager_obj = TemplateManager()
-        theme_manager = ThemeManager()
-        
-        # Extrair nome do tema se fornecido (implementação futura)
-        theme = None
-        
-        # Gerar certificados
-        html_contents = []
-        file_names = []
-        
-        # Extrair placeholders do template para informação
-        placeholders = template_manager_obj.extract_placeholders(template_content)
-        console.print(f"Placeholders encontrados no template: {len(placeholders)}")
-        
-        with console.status("[bold green]Processando certificados...") as status:            # Inicializar o gerenciador de autenticação
-            from app.authentication_manager import AuthenticationManager
-            auth_manager = AuthenticationManager()
-            
-            for index, row in df.iterrows():
-                # Obter dados do CSV
-                csv_data = row.to_dict()
-                
-                # Mesclar com valores padrão (parâmetros.json)
-                data = parameter_manager.merge_placeholders(csv_data, theme)
-                
-                # Gerar código de autenticação e QR code
-                nome = data.get('nome', f"Participante {index+1}")
-                evento = data.get('evento', "Evento")
-                data_evento = data.get('data', "")
-                
-                codigo_autenticacao = auth_manager.gerar_codigo_autenticacao(
-                    nome_participante=nome,
-                    evento=evento,
-                    data_evento=data_evento
-                )                # Adicionar informações de autenticação aos dados
-                data['codigo_autenticacao'] = codigo_autenticacao
-                data['codigo_verificacao'] = codigo_autenticacao
-                url_base = "https://nepemufsc.com/verificar-certificados"
-                data['url_verificacao'] = url_base
-                data['url_qrcode'] = auth_manager.gerar_qrcode_data(codigo_autenticacao)
-                data['qrcode_base64'] = auth_manager.gerar_qrcode_base64(codigo_autenticacao)
+        # TemplateManager instance for temporary template handling by this command
+        cli_template_manager = GlobalTemplateManager()
 
-                # Informar sobre placeholders ainda não preenchidos
-                missing_placeholders = [p for p in placeholders if p not in data]
-                if missing_placeholders and index == 0:  # Mostrar apenas para o primeiro certificado
-                    console.print(f"[yellow]Aviso: Os seguintes placeholders não têm valores definidos e aparecerão vazios:[/yellow]")
-                    console.print(f"[yellow]{', '.join(missing_placeholders)}[/yellow]")
-                
-                # Gerar nome do arquivo
-                if "nome" in data:
-                    file_name = f"certificado_{data['nome'].strip().replace(' ', '_')}.pdf"
-                else:
-                    file_name = f"certificado_{index+1}.pdf"
-                
-                # Caminho completo para o arquivo
-                file_path = os.path.join(output, file_name)
-                
-                # Usar o template_manager para renderizar o template com Jinja2
-                base_name = os.path.basename(template)
-                temp_path = os.path.join("templates", f"temp_{base_name}")
-                
-                # Salvar temporariamente o template para usar o renderizador
-                with open(temp_path, "w", encoding="utf-8") as f:
-                    f.write(template_content)
-                
+        # Prepare template for the service:
+        # The service expects template_name to be a file in its managed templates_dir.
+        # So, we read the template provided by path, save it to the managed dir,
+        # then pass its basename to the service.
+        template_file_name = os.path.basename(template)
+        original_template_in_managed_dir = False
+        managed_template_path = os.path.join(cli_template_manager.templates_dir, template_file_name)
+
+        try:
+            # Check if the source template is already in the managed directory
+            if os.path.abspath(template) == os.path.abspath(managed_template_path):
+                original_template_in_managed_dir = True
+                console.print(f"[dim]Template '{template_file_name}' já está no diretório gerenciado.[/dim]")
+            else:
+                with open(template, 'r', encoding='utf-8') as f:
+                    original_template_content = f.read()
+                # Save it to the managed directory so the service can find it by name
+                cli_template_manager.save_template(template_file_name, original_template_content)
+                console.print(f"[green]✓[/green] Template '{template_file_name}' preparado para o serviço (copiado para {cli_template_manager.templates_dir}).")
+        except Exception as e:
+            console.print(f"[bold red]Erro ao preparar template '{template}': [/bold red]{str(e)}")
+            sys.exit(1)
+
+        # Carregar dados do CSV (for count display, actual processing by service)
+        try:
+            df = pd.read_csv(csv_file) # Still load for count, service handles actual data loading
+            console.print(f"[green]✓[/green] Arquivo CSV '{csv_file}' carregado: {len(df)} registros indicados para processamento.")
+        except Exception as e:
+            console.print(f"[bold red]Erro ao carregar CSV '{csv_file}': [/bold red]{str(e)}")
+            # Attempt to remove temporary template before exiting if it was copied
+            if not original_template_in_managed_dir and os.path.exists(managed_template_path):
                 try:
-                    html_content = template_manager_obj.render_template(os.path.basename(temp_path), data)
-                    
-                    # Adicionar à lista
-                    html_contents.append(html_content)
-                    file_names.append(file_path)
-                    
-            # Atualizar status
-                    console.print(f"Processando certificado {index+1}/{len(df)}: {data.get('nome', f'Registro {index+1}')}", end="\r")
-                    
-                    # Salvar informações do certificado para verificação posterior
-                    auth_manager.salvar_codigo(
-                        data['codigo_autenticacao'],
-                        data['nome'],
-                        data.get('evento', 'Evento'),
-                        data.get('data', ''),
-                        data.get('local', 'Local não especificado'),
-                        data.get('carga_horaria', '0')
-                    )
-                    
-                finally:
-                    # Limpar arquivo temporário
-                    if os.path.exists(temp_path):
-                        os.remove(temp_path)
+                    os.remove(managed_template_path)
+                    console.print(f"[dim]Template temporário '{template_file_name}' limpo após erro.[/dim]")
+                except Exception as e_clean:
+                    console.print(f"[yellow]Aviso: Não foi possível limpar o template temporário '{template_file_name}' ao sair: {str(e_clean)}[/yellow]")
+            sys.exit(1)
+
+        # Parameters for the service call
+        event_data = {} # Event details are not directly prompted in this CLI mode; service relies on CSV/parameters.json
+        theme_name = None # Themes are not supported in this CLI mode currently
+        has_header = True # Default assumption for this CLI mode; CSVs for batch usually have headers.
+
+        console.print(f"Chamando CertificateService para geração em lote...")
+        # Call the service to generate certificates
+        generation_result = certificate_service.generate_certificates_batch(
+            csv_file_path=csv_file,
+            event_details=event_data,
+            template_name=template_file_name, # Basename of the template path
+            theme_name=theme_name,
+            has_header=has_header
+        )
+
+        # Cleanup temporary template if it was copied
+        if not original_template_in_managed_dir and os.path.exists(managed_template_path):
+            try:
+                os.remove(managed_template_path)
+                console.print(f"[dim]Template temporário '{template_file_name}' limpo.[/dim]")
+            except FileNotFoundError: # Should not happen if os.path.exists was true, but good practice
+                console.print(f"[dim]Template temporário '{template_file_name}' já havia sido removido ou não existia.[/dim]")
+            except Exception as e:
+                console.print(f"[yellow]Aviso: Não foi possível limpar o template temporário '{template_file_name}': {str(e)}[/yellow]")
+
+        # Handle Results from CertificateService
+        if generation_result["success_count"] > 0:
+            console.print(f"[bold green]✓ {generation_result['success_count']} certificados gerados com sucesso![/bold green]")
+            # Optional: list all generated files
+            # for file_path in generation_result["generated_files"]:
+            #     console.print(f"  [green]•[/green] {file_path}")
+
+        if generation_result["failed_count"] > 0:
+            console.print(f"[bold red]✗ {generation_result['failed_count']} certificados falharam ao gerar.[/bold red]")
+
+        if generation_result["errors"]:
+            console.print("\n[bold yellow]Erros e Avisos durante a geração:[/bold yellow]")
+            for error_msg in generation_result["errors"]:
+                console.print(f"  [yellow]•[/yellow] {error_msg}")
         
-        # Gerar PDFs em batch
-        generated_paths = pdf_generator.batch_generate(html_contents, file_names)
-        console.print(f"[bold green]✓ {len(generated_paths)} certificados gerados com sucesso![/bold green]")
-        
-        # Criar arquivo ZIP se solicitado
-        if zip:
+        # Criar arquivo ZIP se solicitado and if files were generated
+        if zip and generation_result["generated_files"]:
             if not zip_name:
                 from datetime import datetime
-                zip_name = f"certificados_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip"
-            elif not zip_name.endswith('.zip'):
+                # A more descriptive default name could use event name if available from parameters
+                # For now, using a timestamped generic name.
+                zip_name_default = f"certificados_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip"
+                zip_name = zip_name_default 
+            
+            if not zip_name.endswith('.zip'):
                 zip_name += '.zip'
                 
             zip_path = os.path.join(output, zip_name)
             
-            # Criar arquivo ZIP
             with console.status("[bold green]Criando arquivo ZIP..."):
-                zip_exporter.create_zip(generated_paths, zip_path)
-            
-            console.print(f"[bold green]✓ Arquivo ZIP criado: [/bold green]{zip_path}")
+                try:
+                    zip_exporter.create_zip(generation_result["generated_files"], zip_path)
+                    console.print(f"[bold green]✓ Arquivo ZIP criado: [/bold green]{zip_path}")
+                except Exception as e_zip:
+                    console.print(f"[bold red]Erro ao criar arquivo ZIP: {str(e_zip)}[/bold red]")
+        elif zip and not generation_result["generated_files"]:
+            console.print(f"[yellow]Nenhum certificado foi gerado para empacotar.[/yellow]")
     
     except Exception as e:
         console.print(f"[bold red]Erro ao gerar certificados: [/bold red]{str(e)}")

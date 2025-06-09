@@ -116,6 +116,7 @@ from app.connectivity_manager import ConnectivityManager
 from app.parameter_manager import ParameterManager
 from app.theme_manager import ThemeManager
 from app.authentication_manager import AuthenticationManager
+from app.certificate_service import CertificateService # Added CertificateService import
 
 # Configuração do console Rich
 console = Console()
@@ -133,6 +134,7 @@ connectivity_manager = ConnectivityManager()
 parameter_manager = ParameterManager()
 theme_manager = ThemeManager()
 auth_manager = AuthenticationManager()
+certificate_service = CertificateService() # Instantiated CertificateService
 
 
 def check_connection_status():
@@ -450,21 +452,8 @@ def generate_certificates_menu():
     
     theme = None if selected_theme == "Nenhum" else selected_theme
     
-    # Carregar template
-    with console.status("[bold green]Carregando template..."):
-        template_content = template_manager.load_template(template_name)
-        if not template_content:
-            console.print(f"[bold red]Erro ao carregar template:[/bold red] Arquivo não encontrado.")
-            return
-        
-        # Aplicar tema se selecionado
-        if theme:
-            theme_settings = theme_manager.load_theme(theme)
-            if theme_settings:
-                template_content = theme_manager.apply_theme_to_template(template_content, theme_settings)
-                console.print(f"[green]✓[/green] Tema '{theme}' aplicado ao template.")
-    
     # Mostrar e revisar parâmetros institucionais
+    # This section is kept for user review, but actual loading/applying of template and theme is done by the service.
     institutional_params = parameter_manager.get_institutional_placeholders()
     
     console.print("\n[bold]Parâmetros Institucionais[/bold]")
@@ -492,19 +481,18 @@ def generate_certificates_menu():
     else:
         console.print("[yellow]Nenhum parâmetro institucional configurado.[/yellow]")
       # Configurar diretório de saída
-    output_dir = quiet_path(
+    output_dir_input = quiet_path(
         "Pasta de destino para os certificados:",
-        default=pdf_generator.output_dir,
+        default=certificate_service.output_dir, # Use service's default
         only_directories=True
     )
-    
-    if not output_dir:
-        output_dir = pdf_generator.output_dir
-    else:
-        # Atualizar o diretório de saída do gerador de PDF
-        pdf_generator.output_dir = output_dir
-        # Garantir que o diretório exista
-        os.makedirs(output_dir, exist_ok=True)
+
+    output_dir = output_dir_input if output_dir_input else certificate_service.output_dir
+
+    # Update the service's output directory and its pdf_generator's output_dir
+    certificate_service.output_dir = output_dir
+    certificate_service.pdf_generator.output_dir = output_dir
+    os.makedirs(output_dir, exist_ok=True) # Ensure directory exists
     
     # Confirmação final
     console.print("\n[bold]Resumo da operação:[/bold]")
@@ -523,147 +511,62 @@ def generate_certificates_menu():
         console.print("[yellow]Operação cancelada.[/yellow]")
         return
     
-    # Gerar certificados
-    html_contents = []
-    file_names = []
-    
-    # Preparar informações comuns para todos os certificados
-    common_data = {
+    # Preparar informações do evento
+    event_data = {
         "evento": evento,
         "data": data,
         "local": local,
         "carga_horaria": carga_horaria,
     }
+
+    # Chamar o serviço de geração de certificados
+    console.print("\n[bold]Iniciando geração de certificados com o serviço...[/bold]")
+    with console.status("[bold green]Processando certificados..."):
+        generation_result = certificate_service.generate_certificates_batch(
+            csv_file_path=csv_path,
+            event_details=event_data,
+            template_name=template_name,
+            theme_name=theme, # theme can be None or the selected theme name
+            has_header=has_header
+        )
+
+    # Exibir resultados
+    console.print("\n[bold blue]== Resultados da Geração ==[/bold blue]")
+    if generation_result["success_count"] > 0:
+        console.print(f"[bold green]✓ {generation_result['success_count']} certificados gerados com sucesso![/bold green]")
+        for file_path in generation_result["generated_files"]:
+            console.print(f"  [green]•[/green] {file_path}")
     
-    # Extrair placeholders do template
-    placeholders = template_manager.extract_placeholders(template_content)
-    console.print(f"\n[bold]Placeholders encontrados no template:[/bold] {len(placeholders)}")
-    
-    with Progress(
-        SpinnerColumn(),
-        TextColumn("[progress.description]{task.description}"),
-        transient=False
-    ) as progress:
-        task = progress.add_task(f"[green]Gerando certificados...", total=num_records)
-        
-        for index, row in df.iterrows():
-            progress.update(task, description=f"[green]Processando certificado {index+1}/{num_records}...")
-              # Combinar dados do participante com as informações comuns
-            participante_data = {"nome": row["nome"]}
-            
-            # Gerar código de autenticação único usando nosso gerenciador
-            codigo_autenticacao = auth_manager.gerar_codigo_autenticacao(
-                nome_participante=participante_data['nome'],
-                evento=evento,
-                data_evento=data
-            )
-            # NOTA: O código de verificação curto foi depreciado
-            # Usamos o próprio código de autenticação como código de verificação
-            codigo_verificacao = codigo_autenticacao
-            
-            # Salvar informações do certificado
-            auth_manager.salvar_codigo(
-                codigo_autenticacao=codigo_autenticacao,
-                nome_participante=participante_data['nome'],
-                evento=evento,
-                data_evento=data,
-                local_evento=local,
-                carga_horaria=carga_horaria
-            )            # Gerar URL para QR Code (se aplicável)
-            qrcode_url = auth_manager.gerar_qrcode_data(codigo_autenticacao)
-            url_base = "https://nepemufsc.com/verificar-certificados"
-            
-            # Adicionar códigos aos dados do participante
-            participante_data["codigo_autenticacao"] = codigo_autenticacao
-            participante_data["codigo_verificacao"] = codigo_verificacao
-            participante_data["url_verificacao"] = url_base
-            participante_data["url_qrcode"] = qrcode_url
-            
-            # Adicionar data de emissão
-            participante_data["data_emissao"] = datetime.now().strftime("%d/%m/%Y")
-            
-            # Mesclar todos os dados
-            csv_data = {**common_data, **participante_data}
-            final_data = parameter_manager.merge_placeholders(csv_data, theme)
-            
-            # Gerar nome do arquivo
-            file_name = f"certificado_{participante_data['nome'].strip().replace(' ', '_')}.pdf"
-            file_path = os.path.join(output_dir, file_name)
-            
-            # Preparar template temporário para renderização
-            temp_name = f"temp_{random.randint(1000, 9999)}.html"
-            temp_path = os.path.join("templates", temp_name)
-            
-            try:
-                # Salvar template temporário
-                with open(temp_path, "w", encoding="utf-8") as f:
-                    f.write(template_content)
-                
-                # Gerar QR code adaptado ao tamanho do placeholder no template
-                qr_info = auth_manager.gerar_qrcode_adaptado(codigo_autenticacao, template_content)
-                final_data["qrcode_base64"] = qr_info["qrcode_base64"]
-                
-                # Renderizar template com os dados
-                html_content = template_manager.render_template(temp_name, final_data)
-                
-                # Substituir o placeholder do QR code pelo QR code real
-                html_content = auth_manager.substituir_qr_placeholder(html_content, qr_info["qrcode_base64"])
-                
-                # Adicionar à lista para geração em lote
-                html_contents.append(html_content)
-                file_names.append(file_path)
-            except Exception as e:
-                console.print(f"[bold red]Erro ao processar certificado {index+1}:[/bold red] {str(e)}")
-            finally:
-                # Limpar arquivo temporário
-                if os.path.exists(temp_path):
-                    os.remove(temp_path)
-            
-            progress.update(task, advance=1)
-    
-    # Gerar PDFs em lote
-    console.print("\n[bold]Gerando arquivos PDF...[/bold]")
-    
-    try:        
-        generated_paths = pdf_generator.batch_generate(html_contents, file_names, orientation='landscape')
-        console.print(f"[bold green]✓ {len(generated_paths)} certificados gerados com sucesso![/bold green]")
-        
-        # Oferecer opção para criar ZIP
-        zip_option = quiet_confirm("Deseja empacotar os certificados em um arquivo ZIP?")
-        
+    if generation_result["failed_count"] > 0:
+        console.print(f"[bold red]✗ {generation_result['failed_count']} certificados falharam ao gerar.[/bold red]")
+
+    if generation_result["errors"]:
+        console.print("\n[bold yellow]Erros e Avisos:[/bold yellow]")
+        for error_msg in generation_result["errors"]:
+            console.print(f"  [yellow]•[/yellow] {error_msg}")
+
+    # Oferecer opção para criar ZIP
+    if generation_result["generated_files"]:
+        zip_option = quiet_confirm("Deseja empacotar os certificados gerados em um arquivo ZIP?")
         if zip_option:
+            zip_name_default = f"{evento.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.zip"
             zip_name = quiet_text(
                 "Nome do arquivo ZIP:",
-                default=f"{evento.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.zip"
+                default=zip_name_default
             )
-            
             if not zip_name.endswith('.zip'):
                 zip_name += '.zip'
-                
+            
             zip_path = os.path.join(output_dir, zip_name)
             
-            # Criar arquivo ZIP
             with console.status("[bold green]Criando arquivo ZIP..."):
-                zip_exporter.create_zip(generated_paths, zip_path)
-            
-            console.print(f"[bold green]✓ Arquivo ZIP criado em:[/bold green] {zip_path}")
-    
-    except Exception as e:
-        console.print(f"[bold red]Erro ao gerar certificados:[/bold red] {str(e)}")
-        console.print(f"[bold yellow]Tipo de erro:[/bold yellow] {type(e).__name__}")
-        
-        # Informações de diagnóstico
-        console.print("\n[bold]Informações de diagnóstico:[/bold]")
-        console.print(f"- Arquivo CSV: {csv_path}")
-        console.print(f"- Template: {template_name}")
-        console.print(f"- Tema aplicado: {selected_theme}")
-        console.print(f"- Número de participantes: {num_records}")
-        console.print(f"- Diretório de saída: {output_dir}")
-        
-        # Exibir stack trace para referência técnica
-        console.print("\n[dim]Stack trace para diagnóstico técnico:[/dim]")
-        import traceback
-        console.print(f"[dim]{traceback.format_exc()}[/dim]")
+                try:
+                    zip_exporter.create_zip(generation_result["generated_files"], zip_path)
+                    console.print(f"[bold green]✓ Arquivo ZIP criado em:[/bold green] {zip_path}")
+                except Exception as e_zip:
+                    console.print(f"[bold red]Erro ao criar arquivo ZIP:[/bold red] {str(e_zip)}")
+    elif not generation_result["errors"] and generation_result["success_count"] == 0 : # No files generated and no specific errors reported by service yet
+        console.print("[yellow]Nenhum certificado foi gerado. Verifique as configurações e o arquivo CSV.[/yellow]")
     
     console.print("\n[dim]Pressione Enter para voltar ao menu...[/dim]")
     input()
@@ -811,7 +714,7 @@ def test_certificate_generation():
         test_data[placeholder] = value
     
     # Gerar PDF de teste
-    output_path = os.path.join(pdf_generator.output_dir, "certificado_teste.pdf")
+    output_path = os.path.join(certificate_service.output_dir, "certificado_teste.pdf") # Use service's output_dir
     
     try:
         with console.status("[bold green]Gerando certificado de teste..."):
@@ -1115,7 +1018,7 @@ def preview_template():
             example_data[placeholder] = f"Exemplo de {placeholder}"
         
         # Gerar PDF de prévia
-        preview_path = os.path.join(pdf_generator.output_dir, "preview_template.pdf")
+        preview_path = os.path.join(certificate_service.output_dir, "preview_template.pdf") # Use service's output_dir
         
         try:
             with console.status("[bold green]Gerando prévia em PDF..."):
@@ -1323,24 +1226,314 @@ def check_connection():
 
 
 def configure_remote_server():
-    """Configura servidor remoto."""
-    # Implementação básica
-    console.print("[yellow]Função ainda não implementada completamente.[/yellow]")
-    input("\nPressione Enter para voltar...")
+    """Configura as opções de conexão com o servidor remoto."""
+    console.clear()
+    console.print("[bold blue]== Configurar Conexão com Servidor Remoto ==[/bold blue]\n")
+
+    current_config = connectivity_manager.config
+    console.print(f"URL do Servidor Atual: [cyan]{current_config.get('server_url', 'Não configurado')}[/cyan]")
+    console.print(f"Chave de API Atual: [cyan]{'Configurada' if current_config.get('api_key') else 'Não configurada'}[/cyan]")
+    console.print(f"Usuário Atual: [cyan]{current_config.get('username', 'Não configurado')}[/cyan]")
+    console.print("---\n")
+
+    new_url = quiet_text(
+        "Nova URL do Servidor (deixe em branco para manter atual):",
+        default=current_config.get('server_url', '')
+    ).strip()
+
+    new_api_key = quiet_text(
+        "Nova Chave de API (deixe em branco para manter atual, '#' para limpar):",
+        default=""  # Don't show current API key
+    ).strip()
+
+    new_username = quiet_text(
+        "Novo Usuário (deixe em branco para manter atual, '#' para limpar):",
+        default=current_config.get('username', '')
+    ).strip()
+    
+    new_password = quiet_text(
+        "Nova Senha (deixe em branco para não alterar se usuário não mudar; '#' para limpar senha):",
+        default="" # Do not display current password
+    ).strip()
+
+    changes_made = False
+    if new_url != current_config.get('server_url', ''): # Check against empty string if not set
+        connectivity_manager.set_server_url(new_url)
+        console.print(f"[green]✓ URL do servidor atualizada para: {new_url if new_url else 'Nenhuma (removida)'}[/green]")
+        changes_made = True
+
+    if new_api_key: # Only process if user typed something for API key
+        if new_api_key == '#':
+            if current_config.get('api_key'): # Only print if there was a key
+                connectivity_manager.set_api_key("")
+                console.print("[yellow]✓ Chave de API removida.[/yellow]")
+                changes_made = True
+            else:
+                console.print("[dim]Nenhuma chave de API para remover.[/dim]")
+        else:
+            connectivity_manager.set_api_key(new_api_key)
+            console.print("[green]✓ Chave de API atualizada.[/green]")
+            changes_made = True
+    
+    # Username and Password Logic
+    current_username_val = current_config.get('username', '')
+    current_password_val = current_config.get('password', '') # Needed for comparison
+    
+    processed_username = current_username_val
+    username_explicitly_changed = False
+
+    if new_username: # User typed something for username
+        if new_username == '#':
+            if current_username_val: # Only if there was a username
+                processed_username = ""
+                console.print("[yellow]✓ Usuário removido.[/yellow]")
+                username_explicitly_changed = True
+            else:
+                console.print("[dim]Nenhum usuário para remover.[/dim]")
+        elif new_username != current_username_val:
+            processed_username = new_username
+            console.print(f"[green]✓ Usuário atualizado para: {processed_username}[/green]")
+            username_explicitly_changed = True
+        # If new_username is same as current_username_val, no change yet for username itself
+
+    processed_password = current_password_val
+
+    if new_password: # User typed something for password
+        if new_password == '#':
+            if current_password_val: # Only if there was a password
+                processed_password = ""
+                console.print("[yellow]✓ Senha removida.[/yellow]")
+            else:
+                console.print("[dim]Nenhuma senha para remover.[/dim]")
+        else:
+            processed_password = new_password
+            console.print("[green]✓ Senha atualizada.[/green]")
+    elif username_explicitly_changed and processed_username != "": 
+        # Username changed (and not to blank), but no new password typed. Clear old password.
+        if current_password_val: # Only if there was an old password
+            processed_password = ""
+            console.print("[yellow]✓ Senha anterior removida devido à mudança de usuário. Defina uma nova senha se necessário.[/yellow]")
+    
+    # If username is cleared, password must also be cleared
+    if processed_username == "" and current_username_val != "": # If username was just cleared
+        if current_password_val: # And there was a password
+             processed_password = "" # Ensure password is also cleared
+             console.print("[yellow]✓ Senha removida pois usuário foi removido.[/yellow]")
 
 
-def upload_certificates():
-    """Envia certificados para o servidor remoto."""
-    # Implementação básica
-    console.print("[yellow]Função ainda não implementada completamente.[/yellow]")
-    input("\nPressione Enter para voltar...")
+    # Update credentials if they actually changed from what's stored
+    if processed_username != current_username_val or processed_password != current_password_val:
+        connectivity_manager.set_credentials(processed_username, processed_password)
+        changes_made = True # This ensures save_config is called
+
+    if not changes_made:
+        console.print("\n[dim]Nenhuma alteração feita.[/dim]")
+    else:
+        connectivity_manager.save_config() 
+        console.print("\n[bold green]✓ Configurações de conexão salvas com sucesso![/bold green]")
+
+    console.print("\n[dim]Pressione Enter para voltar ao menu...[/dim]")
+    input()
 
 
-def download_templates():
-    """Baixa templates do servidor remoto."""
-    # Implementação básica
-    console.print("[yellow]Função ainda não implementada completamente.[/yellow]")
-    input("\nPressione Enter para voltar...")
+def upload_certificates_ui():
+    """Interface do usuário para enviar certificados para o servidor remoto."""
+    console.clear()
+    console.print("[bold blue]== Enviar Certificados para Servidor Remoto ==[/bold blue]\n")
+
+    # Check if server is configured
+    if not connectivity_manager.config.get("server_url"):
+        console.print("[yellow]URL do servidor não configurada. Configure o servidor primeiro.[/yellow]")
+        console.print("\n[dim]Pressione Enter para voltar ao menu...[/dim]")
+        input()
+        return
+
+    console.print(f"Enviando para: [cyan]{connectivity_manager.config['server_url']}[/cyan]")
+
+    default_output_dir = certificate_service.output_dir # Use global certificate_service instance
+
+    pdf_dir = quiet_path(
+        "Selecione o diretório contendo os certificados PDF para enviar:",
+        default=default_output_dir,
+        only_directories=True,
+        validate=lambda path: os.path.isdir(path)
+    )
+
+    if not pdf_dir:
+        console.print("[yellow]Operação cancelada.[/yellow]")
+        return
+
+    # List PDF files in the selected directory
+    try:
+        pdf_files = [f for f in os.listdir(pdf_dir) if f.lower().endswith(".pdf")]
+        if not pdf_files:
+            console.print(f"[yellow]Nenhum arquivo PDF encontrado em '{pdf_dir}'.[/yellow]")
+            console.print("\n[dim]Pressione Enter para voltar ao menu...[/dim]")
+            input()
+            return
+        
+        console.print(f"\nArquivos PDF encontrados em '{os.path.basename(pdf_dir)}':")
+        for i, fname in enumerate(pdf_files):
+             console.print(f"  {i+1}. {fname}")
+
+    except Exception as e:
+        console.print(f"[red]Erro ao listar arquivos PDF: {str(e)}[/red]")
+        console.print("\n[dim]Pressione Enter para voltar ao menu...[/dim]")
+        input()
+        return
+    
+    # Ask for confirmation
+    confirm_upload = quiet_confirm(f"\nDeseja enviar {len(pdf_files)} certificado(s) para o servidor?")
+    if not confirm_upload:
+        console.print("[yellow]Envio cancelado.[/yellow]")
+        return
+
+    full_file_paths = [os.path.join(pdf_dir, fname) for fname in pdf_files]
+
+    with console.status("[bold green]Enviando certificados...", spinner="dots") as status:
+        result = connectivity_manager.upload_certificates(full_file_paths)
+
+        if result.get("success", False):
+            status.update("[bold green]Certificados enviados com sucesso![/bold green]")
+            console.print(f"\n[green]✓ {result.get('message', 'Envio concluído.')}[/green]")
+            if result.get("files_processed") is not None: # Check if key exists
+                console.print(f"  Arquivos processados: {result.get('files_processed')}")
+            if result.get("details"): # Assuming 'details' is a list of dicts
+                console.print("  Detalhes do envio:")
+                for item in result.get("details", []):
+                    item_status = item.get('status', 'N/A')
+                    item_error = item.get('error', '')
+                    error_msg = f", Erro: {item_error}" if item_error else ""
+                    console.print(f"    - Arquivo: {item.get('filename', 'N/A')}, Status: {item_status}{error_msg}")
+        else:
+            status.update("[bold red]Falha no envio dos certificados.[/bold red]")
+            console.print(f"\n[red]✗ {result.get('message', 'Erro desconhecido durante o envio.')}[/red]")
+    
+    console.print("\n[dim]Pressione Enter para voltar ao menu...[/dim]")
+    input()
+
+
+def download_templates_ui():
+    """Interface do usuário para baixar templates do servidor remoto."""
+    console.clear()
+    console.print("[bold blue]== Baixar Templates do Servidor Remoto ==[/bold blue]\n")
+
+    if not connectivity_manager.config.get("server_url"):
+        console.print("[yellow]URL do servidor não configurada. Configure o servidor primeiro.[/yellow]")
+        console.print("\n[dim]Pressione Enter para voltar ao menu...[/dim]")
+        input()
+        return
+
+    console.print(f"Buscando templates de: [cyan]{connectivity_manager.config['server_url']}[/cyan]")
+
+    with console.status("[bold green]Buscando lista de templates disponíveis...", spinner="dots") as status:
+        list_result = connectivity_manager.download_templates() # This lists templates
+
+        if not list_result.get("success") or not list_result.get("templates"):
+            status.update("[bold red]Falha ao buscar templates.[/bold red]")
+            message = list_result.get('message', 'Não foi possível obter a lista de templates do servidor.')
+            console.print(f"[red]✗ {message}[/red]")
+            if isinstance(list_result.get("templates"), list) and not list_result.get("templates") and list_result.get("success"):
+                 console.print("[yellow]Nenhum template encontrado no servidor.[/yellow]")
+            console.print("\n[dim]Pressione Enter para voltar ao menu...[/dim]")
+            input()
+            return
+        
+        status.update("[bold green]Lista de templates recebida.[/bold green]")
+        remote_templates = list_result.get("templates", [])
+
+    console.print("\n[bold]Templates disponíveis no servidor:[/bold]")
+    
+    if not remote_templates: # Should be caught above, but double check
+        console.print("[yellow]Nenhum template encontrado no servidor.[/yellow]")
+        console.print("\n[dim]Pressione Enter para voltar ao menu...[/dim]")
+        input()
+        return
+
+    template_choices = []
+    for idx, t_info in enumerate(remote_templates):
+        choice_label = f"{t_info.get('name', f'Template {idx+1}')}"
+        if t_info.get('description'):
+            choice_label += f" - {t_info.get('description')}"
+        if t_info.get('version'): # Assuming API might provide version
+            choice_label += f" (v{t_info.get('version')})"
+        template_choices.append({"name": choice_label, "value": t_info.get('name'), "checked": False})
+
+    if not template_choices:
+        console.print("[red]Erro ao processar lista de templates recebidos.[/red]")
+        input("\nPressione Enter para voltar...")
+        return
+
+    selected_template_names = quiet_checkbox(
+        "Selecione os templates que deseja baixar (espaço para marcar, Enter para confirmar):",
+        choices=template_choices
+    )
+
+    if not selected_template_names:
+        console.print("[yellow]Nenhum template selecionado para download.[/yellow]")
+        console.print("\n[dim]Pressione Enter para voltar ao menu...[/dim]")
+        input()
+        return
+
+    console.print(f"\nBaixando {len(selected_template_names)} template(s)...")
+    target_template_dir = template_manager.templates_dir 
+    os.makedirs(target_template_dir, exist_ok=True)
+    
+    downloaded_count = 0
+    failed_count = 0
+    download_errors = []
+
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        TaskProgressColumn(),
+        transient=False # Keep progress bar visible after completion
+    ) as progress_bar:
+        download_task = progress_bar.add_task("Baixando...", total=len(selected_template_names))
+
+        for template_name_to_download in selected_template_names:
+            if not template_name_to_download: continue
+
+            progress_bar.update(download_task, description=f"Baixando {template_name_to_download}...")
+            
+            local_template_path = os.path.join(target_template_dir, template_name_to_download)
+            if os.path.exists(local_template_path):
+                overwrite = quiet_confirm(
+                    f"O template '{template_name_to_download}' já existe localmente. Deseja sobrescrevê-lo?",
+                    default=False
+                )
+                if not overwrite:
+                    console.print(f"[yellow]Download de '{template_name_to_download}' pulado.[/yellow]")
+                    progress_bar.update(download_task, advance=1)
+                    continue
+            
+            download_specific_result = connectivity_manager.download_specific_template(
+                template_name_to_download, 
+                target_template_dir
+            )
+
+            if download_specific_result.get("success"):
+                console.print(f"[green]✓ Template '{template_name_to_download}' baixado para '{target_template_dir}'.[/green]")
+                downloaded_count += 1
+            else:
+                error_msg = download_specific_result.get('message', 'Erro desconhecido')
+                console.print(f"[red]✗ Falha ao baixar '{template_name_to_download}': {error_msg}[/red]")
+                failed_count += 1
+                download_errors.append(f"{template_name_to_download}: {error_msg}")
+            progress_bar.update(download_task, advance=1)
+
+    console.print("\n[bold]Resumo do Download:[/bold]")
+    console.print(f"[green]Templates baixados com sucesso: {downloaded_count}[/green]")
+    if failed_count > 0:
+        console.print(f"[red]Falhas no download: {failed_count}[/red]")
+        if download_errors:
+             console.print("[bold red]Detalhes dos erros:[/bold red]")
+             for error in download_errors:
+                 console.print(f"  - {error}")
+    
+    console.print("\n[dim]Pressione Enter para voltar ao menu...[/dim]")
+    input()
 
 
 def configure_credentials():
@@ -1806,7 +1999,7 @@ def debug_system_check():
     
     directories = {
         "Templates": "templates",
-        "Output": "output", 
+        "Output": certificate_service.output_dir, 
         "Config": "config",
         "App": "app"
     }
@@ -1961,6 +2154,16 @@ def manage_templates_menu():
     manage_templates_menu()
 
 
+def show_sync_history_stub():
+    """Placeholder for showing synchronization history."""
+    console.clear()
+    console.print("[bold blue]== Histórico de Sincronização ==[/bold blue]\n")
+    console.print("[yellow]Esta função ainda não está implementada.[/yellow]")
+    console.print("\n[dim]Pressione Enter para voltar ao menu...[/dim]")
+    input()
+    connectivity_menu() # Return to connectivity menu
+
+
 def connectivity_menu():
     """Menu de conectividade e sincronização."""
     console.clear()
@@ -1982,39 +2185,53 @@ def connectivity_menu():
         choices=[
             "🔄 Verificar conexão",
             "⚙️ Configurar servidor",
-            "📤 Sincronizar dados",
-            "📋 Histórico de sincronização",
+            "📤 Enviar Certificados Gerados",
+            "📥 Baixar Templates do Servidor",
+            "📋 Histórico de sincronização", 
             "↩️ Voltar ao menu principal"
         ],
         style=get_menu_style()
     )
     
     if choice == "🔄 Verificar conexão":
-        with console.status("[bold green]Verificando conexão..."):
-            result = connectivity_manager.test_connection()
+        console.clear()
+        console.print("[bold blue]== Status da Conexão ==[/bold blue]\n")
         
-        if result["success"]:
-            console.print("[bold green]✓ Conexão bem-sucedida![/bold green]")
-        else:
-            console.print(f"[bold red]✗ Falha na conexão:[/bold red] {result.get('error', 'Erro desconhecido')}")
+        if not connectivity_manager.config.get("server_url"):
+            console.print("[yellow]URL do servidor não configurada. Configure o servidor primeiro.[/yellow]")
+            console.print("\n[dim]Pressione Enter para voltar ao menu...[/dim]")
+            input()
+            connectivity_menu()
+            return
+
+        with console.status("[bold green]Verificando conexão com o servidor...", spinner="dots"):
+            result = connectivity_manager.check_connection() 
         
-        input("\nPressione Enter para continuar...")
+        status_color = "green" if result.get("status") == "Conectado" else "red"
+        console.print(f"Status: [{status_color}]{result.get('status', 'Desconhecido')}[/{status_color}]")
+        console.print(f"Mensagem: {result.get('message', 'N/A')}")
+        console.print(f"Horário da Verificação: {result.get('timestamp', 'N/A')}")
+        console.print(f"URL do Servidor: {connectivity_manager.config.get('server_url', 'Não configurada')}")
+
+        console.print("\n[dim]Pressione Enter para voltar ao menu...[/dim]")
+        input()
         connectivity_menu()
     
     elif choice == "⚙️ Configurar servidor":
-        console.print("[yellow]Função ainda não implementada.[/yellow]")
-        input("\nPressione Enter para voltar...")
+        configure_remote_server()
         connectivity_menu()
     
-    elif choice == "📤 Sincronizar dados":
-        console.print("[yellow]Função ainda não implementada.[/yellow]")
-        input("\nPressione Enter para voltar...")
+    elif choice == "📤 Enviar Certificados Gerados":
+        upload_certificates_ui()
         connectivity_menu()
+
+    elif choice == "📥 Baixar Templates do Servidor": 
+        download_templates_ui() 
+        # connectivity_menu() is called at the end of download_templates_ui
     
     elif choice == "📋 Histórico de sincronização":
-        console.print("[yellow]Função ainda não implementada.[/yellow]")
-        input("\nPressione Enter para voltar...")
-        connectivity_menu()
+        show_sync_history_stub()
+        # connectivity_menu() is called at the end of show_sync_history_stub
     
     elif choice == "↩️ Voltar ao menu principal":
         return
@@ -2061,7 +2278,7 @@ def show_help():
 • Evite elementos CSS complexos como flexbox ou posicionamento absoluto
 • Configure valores institucionais para reutilizar informações comuns
 
-[bold cyan]Suporte:[/bold cyan]
+[bold [bold cyan]Suporte:[/bold cyan]
 • Versão atual: v1.1.0
 • Para problemas técnicos, ative o modo DEBUG nas configurações
 • Templates de exemplo estão disponíveis na pasta 'templates'
