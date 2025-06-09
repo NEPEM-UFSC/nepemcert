@@ -61,6 +61,6 @@
         "url_verificacao": "https://nepemufsc.com/verificar-certificado/"
     },
     "system_settings": {
-        "debug_mode": false
+        "debug_mode": true
     }
 }
