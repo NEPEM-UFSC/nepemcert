@@ -214,8 +214,9 @@ def test_validate_placeholders_against_csv(template_manager):
     assert "data_nao_existe" in missing
     assert len(missing) == 1
 
+    # Teste com lista vazia
     missing = template_manager.validate_placeholders_against_csv(placeholders, [])
-    assert len(missing) == 3
+    assert len(missing) == 3  # Todos os placeholders devem estar ausentes
 
 
 @pytest.fixture(scope="session", autouse=True)
