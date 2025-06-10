@@ -2,6 +2,7 @@ import os
 import random
 from datetime import datetime
 import pandas as pd # Ensure pandas is imported
+import jinja2 # Added for direct string template rendering
 
 from .csv_manager import CSVManager
 from .template_manager import TemplateManager
@@ -42,7 +43,8 @@ class CertificateService:
             "success_count": 0,
             "failed_count": 0,
             "generated_files": [],
-            "errors": []
+            "errors": [],
+            "warnings": [] # Initialized warnings list
         }
 
         # Load CSV data
@@ -62,7 +64,8 @@ class CertificateService:
 
             if df["nome"].isna().any():
                 null_count = df["nome"].isna().sum()
-                results["errors"].append(f"Warning: CSV contains {null_count} empty 'nome' values.")
+                # Changed from results["errors"] to results["warnings"]
+                results["warnings"].append(f"CSV contains {null_count} empty 'nome' values that will be skipped.")
             df = df.dropna(subset=["nome"])
             if df.empty:
                 results["errors"].append("No valid participant data found in CSV after handling empty names.")
@@ -92,6 +95,13 @@ class CertificateService:
         html_contents_to_generate = []
         pdf_file_paths = []
         base_data = {**event_details}
+
+        # Create Jinja2 Template object once from the (potentially themed) template_content string
+        try:
+            jinja_template = jinja2.Template(template_content)
+        except Exception as e_jinja_setup:
+            results["errors"].append(f"Failed to create Jinja2 template: {str(e_jinja_setup)}")
+            return results
 
         for index, row in df.iterrows():
             try:
@@ -134,32 +144,22 @@ class CertificateService:
                     theme_name if theme_name and theme_name.lower() != "nenhum" else None
                 )
                 
-                # Ensure qrcode_base64 is generated and added to final_data
-                # Assuming gerar_qrcode_adaptado and substituir_qr_placeholder exist in auth_manager
-                # These methods might need to be implemented or verified in AuthenticationManager
-                if hasattr(self.auth_manager, 'gerar_qrcode_adaptado') and hasattr(self.auth_manager, 'substituir_qr_placeholder'):
-                    qr_info = self.auth_manager.gerar_qrcode_adaptado(auth_code, template_content)
-                    final_data["qrcode_base64"] = qr_info.get("qrcode_base64", "") # Ensure key exists
-                else:
-                    # Fallback or default QR generation if adaptive methods are missing
-                    final_data["qrcode_base64"] = self.auth_manager.gerar_qrcode_base64(auth_code)
+                # Generate QR code using the standardized gerar_qrcode_base64 method
+                qrcode_base64 = self.auth_manager.gerar_qrcode_base64(auth_code, url_base=url_base)
+                final_data["qrcode_base64"] = qrcode_base64 # Add to data for rendering if template uses it directly (e.g. for alt text or other data)
 
+                # Note: The placeholder will be replaced in the rendered HTML.
+                # template_content (themed) is used by jinja_template.
 
-                temp_render_template_name = f"render_{random.randint(1000,9999)}_{os.path.basename(template_name)}"
-                temp_render_template_path = os.path.join(self.template_manager.templates_dir, temp_render_template_name)
+                # Render the template with participant data using the Jinja2 template object
+                # final_data already includes qrcode_base64 if needed by template for non-image uses
+                html_cert_content_rendered = jinja_template.render(final_data)
+                
+                # Replace the placeholder in the rendered HTML with the actual QR code image
+                # The qrcode_base64 generated above is used here.
+                html_cert_content = self.auth_manager.substituir_qr_placeholder(html_cert_content_rendered, qrcode_base64)
 
-                try:
-                    with open(temp_render_template_path, "w", encoding="utf-8") as f_temp:
-                        f_temp.write(template_content)
-                    html_cert_content = self.template_manager.render_template(os.path.basename(temp_render_template_path), final_data)
-                    
-                    if hasattr(self.auth_manager, 'substituir_qr_placeholder'):
-                         html_cert_content = self.auth_manager.substituir_qr_placeholder(html_cert_content, final_data["qrcode_base64"])
-                    # else: placeholder replacement might need to be handled differently if method is missing
-
-                finally:
-                    if os.path.exists(temp_render_template_path):
-                        os.remove(temp_render_template_path)
+                # Removed temporary file logic for rendering
 
                 safe_name = "".join(c if c.isalnum() else "_" for c in participant_name)
                 pdf_file_name = f"certificado_{safe_name}_{index+1}.pdf"
