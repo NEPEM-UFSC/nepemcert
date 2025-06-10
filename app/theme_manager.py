@@ -226,92 +226,208 @@ class ThemeManager:
         
         return False    
 
+    def _map_font_to_safe(self, font_family):
+        """
+        Mapeia famílias de fontes para versões web-safe compatíveis com PDF.
+        
+        Args:
+            font_family (str): Família de fonte original
+            
+        Returns:
+            str: Família de fonte mapeada para versão web-safe
+        """
+        # Dicionário de mapeamento de fontes para versões web-safe
+        safe_fonts = {
+            # Fontes serifadas
+            'Times New Roman': 'Times, serif',
+            'Times': 'Times, serif',
+            'Georgia': 'Georgia, serif',
+            'Garamond': 'Georgia, serif',
+            'Book Antiqua': 'Georgia, serif',
+            
+            # Fontes sans-serif
+            'Arial': 'Arial, sans-serif',
+            'Helvetica': 'Helvetica, Arial, sans-serif',
+            'Helvetica Neue': 'Helvetica, Arial, sans-serif',
+            'Verdana': 'Verdana, sans-serif',
+            'Tahoma': 'Verdana, sans-serif',
+            'Trebuchet MS': 'Verdana, sans-serif',
+            'Calibri': 'Arial, sans-serif',
+            'Segoe UI': 'Arial, sans-serif',
+            'Roboto': 'Arial, sans-serif',
+            'Open Sans': 'Arial, sans-serif',
+            'Lato': 'Arial, sans-serif',
+            'Montserrat': 'Helvetica, Arial, sans-serif',
+            'Source Sans Pro': 'Arial, sans-serif',
+            'Ubuntu': 'Arial, sans-serif',
+            'Nunito': 'Arial, sans-serif',
+            'PT Sans': 'Arial, sans-serif',
+            'Poppins': 'Arial, sans-serif',
+            'Inter': 'Arial, sans-serif',
+            
+            # Fontes monoespaçadas
+            'Courier New': 'Courier, monospace',
+            'Courier': 'Courier, monospace',
+            'Monaco': 'Courier, monospace',
+            'Consolas': 'Courier, monospace',
+            'Source Code Pro': 'Courier, monospace',
+            
+            # Fontes decorativas/especiais
+            'Impact': 'Arial Black, sans-serif',
+            'Arial Black': 'Arial Black, sans-serif',
+            'Comic Sans MS': 'Arial, sans-serif',
+            'Brush Script MT': 'cursive',
+            'Lucida Handwriting': 'cursive'
+        }
+        
+        # Limpar a string da fonte (remover espaços extras, etc.)
+        font_family = font_family.strip()
+        
+        # Se já contém fallbacks (vírgulas), usar como está
+        if ',' in font_family:
+            return font_family
+        
+        # Procurar mapeamento direto
+        if font_family in safe_fonts:
+            return safe_fonts[font_family]
+        
+        # Procurar mapeamento parcial (case-insensitive)
+        font_lower = font_family.lower()
+        for font_key, font_value in safe_fonts.items():
+            if font_key.lower() in font_lower or font_lower in font_key.lower():
+                return font_value
+        
+        # Se não encontrar mapeamento, determinar categoria baseada em palavras-chave
+        font_lower = font_family.lower()
+        
+        # Verificar se é serif
+        serif_keywords = ['serif', 'times', 'roman', 'garamond', 'georgia', 'book']
+        if any(keyword in font_lower for keyword in serif_keywords):
+            return f"{font_family}, serif"
+        
+        # Verificar se é monospace
+        mono_keywords = ['mono', 'courier', 'code', 'console', 'terminal']
+        if any(keyword in font_lower for keyword in mono_keywords):
+            return f"{font_family}, monospace"
+        
+        # Verificar se é cursive/script
+        script_keywords = ['script', 'handwriting', 'cursive', 'brush']
+        if any(keyword in font_lower for keyword in script_keywords):
+            return f"{font_family}, cursive"
+        
+        # Padrão: sans-serif
+        return f"{font_family}, sans-serif"
+
     def apply_theme_to_template(self, html_content, theme_settings):
         """
-        Aplica as configurações de tema ao HTML do template.
-        Gera um bloco <style> com as configurações do tema e o injeta no <head>.
-        """
-        css_rules = []
-
-        font_family = theme_settings.get("font_family")
-        if font_family:
-            # Font security/mapping from existing code
-            safe_fonts = {
-                "'Crimson Text', 'Garamond', 'Times New Roman', serif": "Times, 'Times New Roman', serif",
-                "'Cormorant Garamond', 'Palatino Linotype', 'Book Antiqua', serif": "Palatino, 'Times New Roman', serif",
-                "'Montserrat', 'Helvetica Neue', Arial, sans-serif": "Helvetica, Arial, sans-serif",
-                "'Raleway', 'Roboto', 'Segoe UI', sans-serif": "Helvetica, Arial, sans-serif",
-                "'Poppins', 'Open Sans', Helvetica, sans-serif": "Helvetica, Arial, sans-serif"
-            }
-            font_family = safe_fonts.get(font_family, font_family)
-            # Added !important to help ensure theme styles override template defaults.
-            css_rules.append(f"body {{ font-family: {font_family} !important; }}")
-
-        text_color = theme_settings.get("text_color")
-        if text_color:
-            # Apply to body and common text containers for broader effect.
-            css_rules.append(f"body, .content, .text, .verification, .footer, p, div {{ color: {text_color} !important; }}")
-
-        background_color = theme_settings.get("background_color")
-        if background_color:
-            # Prefer styling a main container if it exists, otherwise body.
-            # Targets common main container class names.
-            css_rules.append(f"body, .certificate, .certificate-container {{ background-color: {background_color} !important; }}")
-
-        bg_image_base64 = theme_settings.get("background_image")
-        if bg_image_base64:
-            image_url = f"data:image/png;base64,{bg_image_base64}"
-            # Apply to body or a specific certificate container.
-            css_rules.append(f"body, .certificate, .certificate-container {{ background-image: url('{image_url}') !important; background-size: cover !important; background-position: center !important; background-repeat: no-repeat !important; }}")
+        Aplica configurações de tema ao template HTML injetando estilos CSS.
         
-        border_color = theme_settings.get("border_color")
-        # Default to 0px width if only color/style is set but no width; user can override.
-        border_width = theme_settings.get("border_width", "0px" if border_color else None)
-        border_style = theme_settings.get("border_style", "solid" if border_color else None)
-        
-        if border_color and border_width and border_style:
-             css_rules.append(f"body, .certificate, .certificate-container {{ border: {border_width} {border_style} {border_color} !important; }}")
-        
-        title_color = theme_settings.get("title_color")
-        if title_color:
-            css_rules.append(f".title, h1 {{ color: {title_color} !important; }}") # Target .title class and h1 tags
-
-        name_color = theme_settings.get("name_color")
-        if name_color:
-            # Targets .name (exemplo) and .participant-name (basico)
-            # Also ensures border-bottom color matches name_color for emphasis.
-            css_rules.append(f".name, .participant-name {{ color: {name_color} !important; border-bottom-color: {name_color} !important; }}")
-
-        event_name_color = theme_settings.get("event_name_color")
-        if event_name_color:
-            css_rules.append(f".event-name, .evento {{ color: {event_name_color} !important; }}")
-
-        signature_color = theme_settings.get("signature_color")
-        if signature_color:
-            css_rules.append(f".signature-line {{ border-top-color: {signature_color} !important; }}")
-            css_rules.append(f".signature-name, .assinatura p, .signature div {{ color: {signature_color} !important; }}") # More general signature text
-
-        link_color = theme_settings.get("link_color")
-        if link_color:
-            css_rules.append(f"a, .nepemcert-link {{ color: {link_color} !important; }}")
-
-        if not css_rules:
-            return html_content # No theme settings to apply
-
-        style_block_content = "\n            ".join(css_rules) # Indent rules for readability in HTML source
-        # Added an ID to the style block for easier identification/debugging.
-        style_block = f"\n<style type=\"text/css\" id=\"nepemcert-theme-styles\">\n        /* Theme Styles Applied by NEPEMCERT */\n        {style_block_content}\n    </style>\n"
-
-        # Inject the style block before the closing </head> tag
-        if "</head>" in html_content:
-            html_content = html_content.replace("</head>", style_block + "</head>", 1)
-        elif "<body>" in html_content: # Fallback if no </head> but <body> exists
-             html_content = html_content.replace("<body>", "<body>" + style_block, 1)
-        else: # Fallback: prepend to the whole document if no head or body tag is found
-            # This is a last resort and might not be ideal for all HTML structures.
-            html_content = style_block + html_content
+        Args:
+            html_content (str): Conteúdo HTML do template
+            theme_settings (dict): Configurações do tema
             
-        return html_content
+        Returns:
+            str: HTML com tema aplicado
+        """
+        if not theme_settings:
+            return html_content
+        
+        # Construir CSS rules baseado nas configurações do tema
+        css_rules = []
+        
+        # Font family (mapear para fontes seguras)
+        if 'font_family' in theme_settings:
+            mapped_font = self._map_font_to_safe(theme_settings['font_family'])
+            css_rules.append(f"body {{ font-family: {mapped_font} !important; }}")
+        
+        # Text color (aplicar a múltiplos seletores)
+        if 'text_color' in theme_settings:
+            color = theme_settings['text_color']
+            css_rules.append(f"body, .content, .text, .verification, .footer, p, div {{ color: {color} !important; }}")
+        
+        # Background color (aplicar apenas se não houver background image)
+        if 'background_color' in theme_settings and not theme_settings.get('background_image'):
+            bg_color = theme_settings['background_color']
+            css_rules.append(f"body, .certificate, .certificate-container {{ background-color: {bg_color} !important; }}")
+        
+        # Border (aplicar a múltiplos seletores)
+        if all(key in theme_settings for key in ['border_width', 'border_style', 'border_color']):
+            border = f"{theme_settings['border_width']} {theme_settings['border_style']} {theme_settings['border_color']}"
+            css_rules.append(f"body, .certificate, .certificate-container {{ border: {border} !important; }}")
+        
+        # Title color
+        if 'title_color' in theme_settings:
+            css_rules.append(f".title, h1 {{ color: {theme_settings['title_color']} !important; }}")
+        
+        # Name color
+        if 'name_color' in theme_settings:
+            color = theme_settings['name_color']
+            css_rules.append(f".name, .participant-name {{ color: {color} !important; border-bottom-color: {color} !important; }}")
+        
+        # Event name color
+        if 'event_name_color' in theme_settings:
+            css_rules.append(f".event-name, .evento {{ color: {theme_settings['event_name_color']} !important; }}")
+        
+        # Signature color
+        if 'signature_color' in theme_settings:
+            color = theme_settings['signature_color']
+            css_rules.append(f".signature-line {{ border-top-color: {color} !important; }}")
+            css_rules.append(f".signature-name, .assinatura p, .signature div {{ color: {color} !important; }}")
+        
+        # Link color
+        if 'link_color' in theme_settings:
+            css_rules.append(f"a, .nepemcert-link {{ color: {theme_settings['link_color']} !important; }}")
+        
+        # Background image - CORRIGIDO: aplicar com data URI completo
+        if 'background_image' in theme_settings and theme_settings['background_image']:
+            base64_img = theme_settings['background_image']
+            
+            # Verificar se já inclui o prefixo data URI
+            if not base64_img.startswith('data:'):
+                # Assumir PNG por padrão se não especificado
+                image_data_uri = f"data:image/png;base64,{base64_img}"
+            else:
+                image_data_uri = base64_img
+            
+            # Aplicar background image ao body com configurações otimizadas para PDF
+            css_rules.append(f"""
+                body {{
+                    background-image: url('{image_data_uri}') !important;
+                    background-size: cover !important;
+                    background-position: center center !important;
+                    background-repeat: no-repeat !important;
+                    background-attachment: fixed !important;
+                }}
+            """.strip())
+            
+            # Garantir que elementos filhos sejam transparentes para mostrar o background
+            css_rules.append(f"""
+                .certificate-container {{
+                    background: transparent !important;
+                }}
+            """.strip())
+        
+        # Se não há regras CSS, retornar HTML original
+        if not css_rules:
+            return html_content
+        
+        # Criar o bloco de estilo CSS
+        css_block = f'''<style type="text/css" id="nepemcert-theme-styles">
+        /* Theme Styles Applied by NEPEMCERT */
+        {chr(10).join(css_rules)}
+</style>'''
+        
+        # Tentar inserir antes de </head>
+        if '</head>' in html_content:
+            return html_content.replace('</head>', f'{css_block}\n</head>')
+        
+        # Se não há </head>, tentar inserir após <body>
+        elif '<body>' in html_content:
+            return html_content.replace('<body>', f'<body>\n{css_block}')
+        
+        # Se não há nem </head> nem <body>, inserir no início
+        else:
+            return f'{css_block}\n{html_content}'
     
     def image_to_base64(self, image_file):
         """Converte uma imagem para base64"""
