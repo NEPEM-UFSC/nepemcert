@@ -7,7 +7,7 @@ também são definidos no módulo themes.py.
 """
 import os
 import json
-import re
+import re # Still needed by other methods like slugify if it were here, or by users of the class
 import base64
 from slugify import slugify
 
@@ -225,138 +225,92 @@ class ThemeManager:
             return True
         
         return False    
+
     def apply_theme_to_template(self, html_content, theme_settings):
         """
-        Aplica as configurações de tema ao HTML do template de forma não-destrutiva.
-        Modifica apenas propriedades decorativas (cores, fontes, bordas) preservando a estrutura.
-        NÃO modifica tamanhos de fonte ou margens para evitar problemas de layout.
+        Aplica as configurações de tema ao HTML do template.
+        Gera um bloco <style> com as configurações do tema e o injeta no <head>.
         """
-        # Extrair configurações do tema - apenas cores e fontes
-        font_family = theme_settings.get("font_family", "Arial, sans-serif")
-        text_color = theme_settings.get("text_color", "#333333")
-        background_color = theme_settings.get("background_color", "#ffffff")
-        border_color = theme_settings.get("border_color", "#1a5276")
-        border_width = theme_settings.get("border_width", "4px")
-        border_style = theme_settings.get("border_style", "solid")
-        name_color = theme_settings.get("name_color", "#1a4971")
-        title_color = theme_settings.get("title_color", "#1a5276")
-        signature_color = theme_settings.get("signature_color", "#333333")
-        event_name_color = theme_settings.get("event_name_color", "#1a5276")
-        link_color = theme_settings.get("link_color", "#1a5276")
+        css_rules = []
+
+        font_family = theme_settings.get("font_family")
+        if font_family:
+            # Font security/mapping from existing code
+            safe_fonts = {
+                "'Crimson Text', 'Garamond', 'Times New Roman', serif": "Times, 'Times New Roman', serif",
+                "'Cormorant Garamond', 'Palatino Linotype', 'Book Antiqua', serif": "Palatino, 'Times New Roman', serif",
+                "'Montserrat', 'Helvetica Neue', Arial, sans-serif": "Helvetica, Arial, sans-serif",
+                "'Raleway', 'Roboto', 'Segoe UI', sans-serif": "Helvetica, Arial, sans-serif",
+                "'Poppins', 'Open Sans', Helvetica, sans-serif": "Helvetica, Arial, sans-serif"
+            }
+            font_family = safe_fonts.get(font_family, font_family)
+            # Added !important to help ensure theme styles override template defaults.
+            css_rules.append(f"body {{ font-family: {font_family} !important; }}")
+
+        text_color = theme_settings.get("text_color")
+        if text_color:
+            # Apply to body and common text containers for broader effect.
+            css_rules.append(f"body, .content, .text, .verification, .footer, p, div {{ color: {text_color} !important; }}")
+
+        background_color = theme_settings.get("background_color")
+        if background_color:
+            # Prefer styling a main container if it exists, otherwise body.
+            # Targets common main container class names.
+            css_rules.append(f"body, .certificate, .certificate-container {{ background-color: {background_color} !important; }}")
+
         bg_image_base64 = theme_settings.get("background_image")
-        
-        # Garantir que apenas fontes seguras sejam usadas
-        safe_fonts = {
-            "'Crimson Text', 'Garamond', 'Times New Roman', serif": "Times, 'Times New Roman', serif",
-            "'Cormorant Garamond', 'Palatino Linotype', 'Book Antiqua', serif": "Palatino, 'Times New Roman', serif",
-            "'Montserrat', 'Helvetica Neue', Arial, sans-serif": "Helvetica, Arial, sans-serif",
-            "'Raleway', 'Roboto', 'Segoe UI', sans-serif": "Helvetica, Arial, sans-serif",
-            "'Poppins', 'Open Sans', Helvetica, sans-serif": "Helvetica, Arial, sans-serif"
-        }
-        font_family = safe_fonts.get(font_family, font_family)
-        
-        # 1. Modificar fonte da família no body
-        html_content = re.sub(
-            r'(body\s*\{[^}]*?)font-family:\s*[^;]+;',
-            f'\\1font-family: {font_family};',
-            html_content,
-            flags=re.MULTILINE | re.DOTALL
-        )
-        
-        # 2. Modificar cor de fundo do body
-        html_content = re.sub(
-            r'(body\s*\{[^}]*?)background-color:\s*[^;]+;',
-            f'\\1background-color: {background_color};',
-            html_content,
-            flags=re.MULTILINE | re.DOTALL
-        )
-        
-        # 3. Modificar borda do body
-        html_content = re.sub(
-            r'(body\s*\{[^}]*?)border:\s*[^;]+;',
-            f'\\1border: {border_width} {border_style} {border_color};',
-            html_content,
-            flags=re.MULTILINE | re.DOTALL
-        )
-          # 4. Modificar cor da fonte do título (mantendo tamanho original)
-        html_content = re.sub(
-            r'(\.title\s*\{[^}]*?)color:\s*[^;]+;',
-            f'\\1color: {title_color};',
-            html_content,
-            flags=re.MULTILINE | re.DOTALL
-        )
-        
-        # 5. Modificar cor da fonte do conteúdo principal (mantendo tamanho original)
-        html_content = re.sub(
-            r'(\.content\s*\{[^}]*?)color:\s*[^;]+;',
-            f'\\1color: {text_color};',
-            html_content,
-            flags=re.MULTILINE | re.DOTALL
-        )
-          # 6. Modificar nome do participante (apenas cor da fonte e da borda)
-        html_content = re.sub(
-            r'(\.participant-name\s*\{[^}]*?)color:\s*[^;]+;',
-            f'\\1color: {name_color};',
-            html_content,
-            flags=re.MULTILINE | re.DOTALL
-        )
-        
-        html_content = re.sub(
-            r'(\.participant-name\s*\{[^}]*?)border-bottom:\s*[^;]+;',
-            f'\\1border-bottom: 2px solid {name_color};',
-            html_content,
-            flags=re.MULTILINE | re.DOTALL
-        )
-        
-        # 7. Modificar cor do nome do evento
-        html_content = re.sub(
-            r'(\.event-name\s*\{[^}]*?)color:\s*[^;]+;',
-            f'\\1color: {event_name_color};',
-            html_content,
-            flags=re.MULTILINE | re.DOTALL
-        )
-        
-        # 8. Modificar linha das assinaturas
-        html_content = re.sub(
-            r'(\.signature-line\s*\{[^}]*?)border-top:\s*[^;]+;',
-            f'\\1border-top: 1px solid {signature_color};',
-            html_content,
-            flags=re.MULTILINE | re.DOTALL
-        )
-          # 9. Modificar cor da fonte das assinaturas (mantendo tamanho original)
-        html_content = re.sub(
-            r'(\.signature-name\s*\{[^}]*?)color:\s*[^;]+;',
-            f'\\1color: {signature_color};',
-            html_content,
-            flags=re.MULTILINE | re.DOTALL
-        )
-        
-        # 10. Modificar cor dos links
-        html_content = re.sub(
-            r'(\.nepemcert-link\s*\{[^}]*?)color:\s*[^;]+;',
-            f'\\1color: {link_color};',
-            html_content,
-            flags=re.MULTILINE | re.DOTALL
-        )
-        
-        # 11. Adicionar imagem de fundo se fornecida (apenas adiciona propriedades, não muda estrutura)
         if bg_image_base64:
-            if "background-image:" in html_content:
-                html_content = re.sub(
-                    r'(body\s*\{[^}]*?)background-image:\s*[^;]+;',
-                    f'\\1background-image: url("data:image/png;base64,{bg_image_base64}");',
-                    html_content,
-                    flags=re.MULTILINE | re.DOTALL
-                )
-            else:
-                # Adicionar propriedades de background após background-color
-                html_content = re.sub(
-                    r'(body\s*\{[^}]*?background-color:\s*[^;]+;)',
-                    f'\\1\n            background-image: url("data:image/png;base64,{bg_image_base64}");\n            background-size: cover;\n            background-position: center;\n            background-repeat: no-repeat;',
-                    html_content,
-                    flags=re.MULTILINE | re.DOTALL
-                )
+            image_url = f"data:image/png;base64,{bg_image_base64}"
+            # Apply to body or a specific certificate container.
+            css_rules.append(f"body, .certificate, .certificate-container {{ background-image: url('{image_url}') !important; background-size: cover !important; background-position: center !important; background-repeat: no-repeat !important; }}")
         
+        border_color = theme_settings.get("border_color")
+        # Default to 0px width if only color/style is set but no width; user can override.
+        border_width = theme_settings.get("border_width", "0px" if border_color else None)
+        border_style = theme_settings.get("border_style", "solid" if border_color else None)
+        
+        if border_color and border_width and border_style:
+             css_rules.append(f"body, .certificate, .certificate-container {{ border: {border_width} {border_style} {border_color} !important; }}")
+        
+        title_color = theme_settings.get("title_color")
+        if title_color:
+            css_rules.append(f".title, h1 {{ color: {title_color} !important; }}") # Target .title class and h1 tags
+
+        name_color = theme_settings.get("name_color")
+        if name_color:
+            # Targets .name (exemplo) and .participant-name (basico)
+            # Also ensures border-bottom color matches name_color for emphasis.
+            css_rules.append(f".name, .participant-name {{ color: {name_color} !important; border-bottom-color: {name_color} !important; }}")
+
+        event_name_color = theme_settings.get("event_name_color")
+        if event_name_color:
+            css_rules.append(f".event-name, .evento {{ color: {event_name_color} !important; }}")
+
+        signature_color = theme_settings.get("signature_color")
+        if signature_color:
+            css_rules.append(f".signature-line {{ border-top-color: {signature_color} !important; }}")
+            css_rules.append(f".signature-name, .assinatura p, .signature div {{ color: {signature_color} !important; }}") # More general signature text
+
+        link_color = theme_settings.get("link_color")
+        if link_color:
+            css_rules.append(f"a, .nepemcert-link {{ color: {link_color} !important; }}")
+
+        if not css_rules:
+            return html_content # No theme settings to apply
+
+        style_block_content = "\n            ".join(css_rules) # Indent rules for readability in HTML source
+        # Added an ID to the style block for easier identification/debugging.
+        style_block = f"\n<style type=\"text/css\" id=\"nepemcert-theme-styles\">\n        /* Theme Styles Applied by NEPEMCERT */\n        {style_block_content}\n    </style>\n"
+
+        # Inject the style block before the closing </head> tag
+        if "</head>" in html_content:
+            html_content = html_content.replace("</head>", style_block + "</head>", 1)
+        elif "<body>" in html_content: # Fallback if no </head> but <body> exists
+             html_content = html_content.replace("<body>", "<body>" + style_block, 1)
+        else: # Fallback: prepend to the whole document if no head or body tag is found
+            # This is a last resort and might not be ideal for all HTML structures.
+            html_content = style_block + html_content
+            
         return html_content
     
     def image_to_base64(self, image_file):
@@ -390,7 +344,7 @@ class ThemeManager:
         else:            # Criar do zero com valores padrão (apenas cores e fontes)
             theme_settings = {
                 "font_family": "Arial, sans-serif",
-                "heading_color": "#1a5276",
+                "heading_color": "#1a5276", # Note: heading_color is not directly used in new apply_theme
                 "text_color": "#333333",
                 "background_color": "#ffffff",
                 "border_color": "#dddddd",
@@ -400,10 +354,10 @@ class ThemeManager:
                 "title_color": "#1a5276",
                 "event_name_color": "#1a5276",
                 "link_color": "#1a5276",
-                "title_text": "Certificado",
+                "title_text": "Certificado", # These text fields are not used by apply_theme_to_template CSS generation
                 "intro_text": "Certifica-se que",
                 "participation_text": "participou do evento",
-                "footer_style": "classic",
+                "footer_style": "classic", # Not used by apply_theme_to_template CSS generation
                 "signature_color": "#333333",
                 "background_image": None
             }
@@ -444,3 +398,4 @@ class ThemeManager:
         except Exception as e:
             print(f"Erro ao carregar imagem de fundo: {e}")
             return False
+

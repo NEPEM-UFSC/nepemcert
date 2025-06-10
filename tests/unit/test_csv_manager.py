@@ -155,8 +155,30 @@ def test_save_uploaded_file(csv_manager, mock_uploaded_file, tmp_path):
 
 # Limpar o diretório de uploads após todos os testes
 @pytest.fixture(scope="session", autouse=True)
-def cleanup_temp_uploads():
-    yield
-    import shutil
-    if os.path.exists("tests/temp_uploads"):
-        shutil.rmtree("tests/temp_uploads")
+def cleanup_temp_uploads(request):
+    """Limpa o diretório de uploads temporário após a sessão de testes."""
+    temp_dir_path = Path("tests/temp_uploads")
+    
+    def finalizer():
+        if temp_dir_path.exists():
+            import shutil
+            for item in temp_dir_path.iterdir():
+                if item.is_file():
+                    item.unlink()
+            try:
+                temp_dir_path.rmdir()
+            except OSError: # Pode não estar vazio se outros arquivos foram criados
+                pass
+                
+    request.addfinalizer(finalizer)
+
+def test_load_data_read_error(csv_manager, tmp_path):
+    """Testa o método load_data com um arquivo CSV que causa erro de leitura."""
+    file_path = tmp_path / "corrupted.csv"
+    # Conteúdo que pode causar um ParserError no pandas
+    with open(file_path, "w", encoding="utf-8") as f:
+        f.write("nome,idade\nJoão,\"texto não fechado\nMaria,30") 
+    
+    with pytest.raises(ValueError) as excinfo:
+        csv_manager.load_data(file_path)
+    assert "Erro ao ler o CSV" in str(excinfo.value)

@@ -127,18 +127,16 @@
         .nepemcert-link:hover {
             text-decoration: underline;
         }
-          .qr-placeholder {
+        #qr-code-placeholder { /* Changed selector from .qr-placeholder to #qr-code-placeholder */
             position: absolute;
             bottom: 80px;
             left: 80px;
-            width: 90px;
-            height: 90px;
-            border: 1px dashed #ccc;
-            background: #f9f9f9;
-            text-align: center;
-            line-height: 60px;
-            font-size: 8px;
-            color: #999;
+            width: 90px; /* Controls the width of the QR code image container */
+            height: 90px; /* Controls the height of the QR code image container */
+            /* Removed styles related to the old text placeholder:
+               border, background, text-align, line-height, font-size, color.
+               The QR code image inserted by AuthenticationManager will fill this div based on these dimensions.
+            */
         }
     </style>
 </head>
@@ -167,9 +165,7 @@
             </div>
         </div>
         
-        <div class="qr-placeholder">
-            QR
-        </div>
+        <div id="qr-code-placeholder"></div> <!-- Replaced old div with new placeholder -->
           <div class="footer">
             <div class="verification-info">
                 A autenticidade deste certificado pode ser verificada em: <strong>{{ url_verificacao }}</strong> 
