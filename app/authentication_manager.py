@@ -183,12 +183,27 @@ class AuthenticationManager:
         
         return f"data:image/png;base64,{img_str}"
     
-    # def gerar_qrcode_adaptado(self, codigo_autenticacao, html_template, url_base="https://nepemufsc.com/verificar-certificados"):
-    #     """
-    #     [REMOVED]
-    #     """
-    #     # This method has been removed.
-    #     pass
+    def gerar_qrcode_adaptado(self, codigo_autenticacao, template_content):
+        """
+        Gera QR code e retorna informações adaptadas para o template.
+        
+        Args:
+            codigo_autenticacao (str): Código de autenticação
+            template_content (str): Conteúdo do template HTML
+            
+        Returns:
+            dict: Dicionário com informações do QR code
+        """
+        # Gerar QR code base64
+        qrcode_base64 = self.gerar_qrcode_base64(codigo_autenticacao)
+        
+        # Retornar informações estruturadas
+        return {
+            "qrcode_base64": qrcode_base64,
+            "codigo_autenticacao": codigo_autenticacao,
+            "url_verificacao": "https://nepemufsc.com/verificar",
+            "template_has_qr_placeholder": "qr-placeholder" in template_content or "qr-code-placeholder" in template_content
+        }
 
     def salvar_codigo(self, codigo_autenticacao, nome_participante, evento, data_evento, local_evento, carga_horaria):
         """

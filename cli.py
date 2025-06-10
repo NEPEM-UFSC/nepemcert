@@ -1749,7 +1749,6 @@ def debug_compare_themes():
     console.print(f"\n[bold green]🎉 Geração concluída![/bold green]")
     console.print(f"[green]✓[/green] Versão do aplicativo: {APP_VERSION}")
     console.print(f"[{'green' if templates else 'yellow'}]{'✓' if templates else '⚠️'}[/{'green' if templates else 'yellow'}] Templates: {len(templates) if templates else 0}")
-    available_themes = theme_manager.list_themes()
     console.print(f"[{'green' if available_themes else 'yellow'}]{'✓' if available_themes else '⚠️'}[/{'green' if available_themes else 'yellow'}] Temas: {len(available_themes) if available_themes else 0}")
     
     if generated_files:
@@ -2287,3 +2286,78 @@ def show_help():
     console.print(help_content)
     
     input("\n[dim]Pressione Enter para voltar ao menu principal...[/dim]")
+
+def debug_generate_certificate_for_theme(tema_nome):
+    """
+    Gera um certificado de teste para um tema específico.
+    
+    Args:
+        tema_nome (str): Nome do tema para testar
+        
+    Returns:
+        tuple: (sucesso, caminho_do_arquivo, erro)
+    """
+    try:
+        from app.template_manager import TemplateManager
+        from app.theme_manager import ThemeManager
+        from app.pdf_generator import PDFGenerator
+        from app.parameter_manager import ParameterManager
+        from app.authentication_manager import AuthenticationManager
+        
+        # Inicializar gerenciadores
+        template_manager = TemplateManager()
+        theme_manager = ThemeManager()
+        pdf_generator = PDFGenerator()
+        param_manager = ParameterManager()
+        auth_manager = AuthenticationManager()
+        
+        # Carregar template padrão
+        template_name = "certificado_v1_basico.html"
+        template_content = template_manager.load_template(template_name)
+        
+        if not template_content:
+            return False, None, f"Template '{template_name}' não encontrado"
+        
+        # Carregar tema
+        theme_settings = theme_manager.load_theme(tema_nome)
+        if not theme_settings:
+            return False, None, f"Tema '{tema_nome}' não encontrado"
+        
+        # Aplicar tema ao template
+        themed_template = theme_manager.apply_theme_to_template(template_content, theme_settings)
+        
+        # Dados de teste
+        dados_teste = {
+            "nome": "João da Silva Santos",
+            "evento": f"Workshop NEPEM - Tema {tema_nome}",
+            "local": "Laboratório de Sistemas de Conhecimento - UFSC",
+            "data": "10 de Janeiro de 2025",
+            "carga_horaria": "40 horas",
+            "coordenador": "Prof. Dr. Ricardo Miranda Barcia",
+            "cidade": "Florianópolis",
+            "data_emissao": "10/01/2025"
+        }
+        
+        # Gerar código de autenticação
+        auth_code = auth_manager.gerar_codigo_autenticacao(dados_teste["nome"], dados_teste["evento"])
+        dados_teste["codigo_verificacao"] = auth_code
+        dados_teste["url_verificacao"] = "https://nepemufsc.com/verificar"
+        
+        # Mesclar com parâmetros do sistema
+        dados_finais = param_manager.merge_placeholders(dados_teste, tema_nome)
+        
+        # Renderizar template
+        html_renderizado = template_manager.render_template_from_string(themed_template, dados_finais)
+        
+        # Gerar QR code e substituir placeholder
+        qrcode_base64 = auth_manager.gerar_qrcode_base64(auth_code)
+        html_final = auth_manager.substituir_qr_placeholder(html_renderizado, qrcode_base64)
+        
+        # Gerar PDF
+        nome_arquivo = f"debug_{tema_nome.replace(' ', '_').lower()}.pdf"
+        caminho_pdf = pdf_generator.generate_pdf(html_final, nome_arquivo, orientation="landscape")
+        
+        return True, caminho_pdf, None
+        
+    except Exception as e:
+        return False, None, str(e)
