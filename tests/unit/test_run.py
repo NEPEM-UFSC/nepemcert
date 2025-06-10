@@ -51,13 +51,17 @@ def test_app_directory_structure(app_path):
         assert os.path.isfile(file_path), f"Arquivo '{file}' não encontrado em: {file_path}"
 
 def test_custom_style_function():
-    """Testa a função apply_custom_style do run.py"""
-    # Este teste é mais complexo porque precisamos simular o ambiente Streamlit
-    # Vamos verificar apenas se o arquivo contém a função
+    """Testa se a função apply_custom_style ou custom_style existe no run.py"""
+    sys.path.insert(0, str(Path(__file__).parent.parent.parent))
     
-    run_path = Path(__file__).parent.parent.parent / "run.py"
-    with open(run_path, 'r', encoding='utf-8') as file:
-        content = file.read()
+    try:
+        import run
+        # Verificar se a função custom_style existe
+        assert hasattr(run, 'custom_style'), "A função custom_style não foi encontrada no run.py"
         
-    assert "def apply_custom_style():" in content, "A função apply_custom_style não foi encontrada no run.py"
-    assert "st.markdown" in content, "A função apply_custom_style não parece estar usando st.markdown"
+        # Testar a execução da função
+        result = run.custom_style()
+        assert result is not None, "A função custom_style deve retornar algo"
+        
+    except ImportError:
+        pytest.fail("O arquivo run.py não pôde ser importado")

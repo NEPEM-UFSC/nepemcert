@@ -30,35 +30,31 @@ def test_diagnose_imports(diagnose_path):
     # Não executamos o módulo pois ele contém código Streamlit que precisa do ambiente correto
 
 def test_list_files_function():
-    """Testa a função list_files do diagnose.py"""
-    # Importa apenas a função list_files do módulo diagnose
+    """Testa se a função list_files existe e funciona corretamente"""
     sys.path.insert(0, str(Path(__file__).parent.parent.parent))
     
-    # Usando um contexto para evitar que streamlit seja inicializado
-    # Isso é uma simulação parcial, já que normalmente precisaríamos de um mock completo do st
-    with pytest.MonkeyPatch.context() as mp:
-        # Cria um mock simples para st
-        class MockSt:
-            def set_page_config(self, **kwargs): pass
-            def title(self, text): pass
-            def write(self, text): pass
-            def subheader(self, text): pass
-            def code(self, text): pass
-            def success(self, text): pass
-            def error(self, text): pass
-            def info(self, text): pass
-            def warning(self, text): pass
-            def markdown(self, text): pass
-            def button(self, text): return False
+    try:
+        import diagnose
         
-        mp.setattr(sys.modules, "streamlit", MockSt())
+        # Verificar se a função list_files existe como atributo do módulo
+        assert hasattr(diagnose, 'list_files'), "A função list_files não foi encontrada no diagnose.py"
         
-        # Agora podemos importar a função list_files
-        from diagnose import list_files
-        
-        # Testa a função com o diretório atual
-        temp_dir = Path(__file__).parent
-        files = list_files(str(temp_dir))
-        
-        # Verifica se a própria lista contém este arquivo de teste
-        assert any("test_diagnose.py" in file for file in files), "A função list_files não retornou este arquivo de teste"
+        # Testar a função com um diretório temporário
+        import tempfile
+        with tempfile.TemporaryDirectory() as temp_dir:
+            # Criar alguns arquivos de teste
+            test_files = ['test1.txt', 'test2.py', 'test3.md']
+            for filename in test_files:
+                with open(os.path.join(temp_dir, filename), 'w') as f:
+                    f.write("test content")
+            
+            # Testar a função
+            files = diagnose.list_files(temp_dir)
+            assert isinstance(files, list), "list_files deve retornar uma lista"
+            assert len(files) == 3, f"Esperado 3 arquivos, encontrado {len(files)}"
+            
+            for test_file in test_files:
+                assert test_file in files, f"Arquivo {test_file} não foi listado"
+    
+    except ImportError:
+        pytest.fail("O módulo diagnose não pôde ser importado")

@@ -111,6 +111,12 @@ def test_create_sample_data(field_mapper):
 
 def test_get_field_info(field_mapper, sample_df):
     """Testa o método get_field_info"""
+    # Garantir que sample_df é um DataFrame, não uma string
+    if isinstance(sample_df, str):
+        # Se sample_df for uma string (caminho), carregar o CSV
+        import pandas as pd
+        sample_df = pd.read_csv(sample_df)
+    
     field_info = field_mapper.get_field_info(sample_df, "nome")
     
     # Verificar se o dicionário retornado contém as chaves esperadas
