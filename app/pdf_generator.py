@@ -1,204 +1,212 @@
 """
 Módulo para geração de PDFs a partir de HTML usando WeasyPrint.
+Fornece funcionalidades para converter templates HTML renderizados em certificados PDF.
 """
+
 import os
 import sys
-import warnings
-import contextlib
-from io import BytesIO, StringIO
-from concurrent.futures import ProcessPoolExecutor
-# import functools # No longer needed
-from weasyprint import HTML, CSS
-from weasyprint.text.fonts import FontConfiguration
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from pathlib import Path
+import weasyprint
+
+def _execute_generate_pdf_task(args):
+    """
+    Função auxiliar para executar a geração de PDF em processo separado.
+    Esta função deve estar no escopo do módulo para ser serializável.
+    
+    Args:
+        args: Tupla contendo (html_content, output_path, orientation)
+    
+    Returns:
+        str: Caminho do arquivo PDF gerado em caso de sucesso
+        
+    Raises:
+        Exception: Em caso de erro na geração
+    """
+    html_content, output_path, orientation = args
+    
+    try:
+        # Configurar CSS para orientação apenas se não já definido
+        css_string = f"""
+        @page {{
+            size: A4 {orientation};
+        }}
+        """
+        
+        # Gerar PDF
+        html_doc = weasyprint.HTML(string=html_content)
+        
+        # Aplicar CSS apenas se necessário
+        stylesheets = []
+        if not '@page' in html_content:
+            css_doc = weasyprint.CSS(string=css_string)
+            stylesheets.append(css_doc)
+        
+        html_doc.write_pdf(output_path, stylesheets=stylesheets)
+        
+        return output_path
+        
+    except Exception as e:
+        raise Exception(f"Erro ao gerar PDF {output_path}: {str(e)}")
 
 class PDFGenerator:
+    """Classe responsável pela geração de PDFs a partir de conteúdo HTML."""
+    
     def __init__(self, output_dir="output"):
+        """
+        Inicializa o gerador de PDF.
+        
+        Args:
+            output_dir (str): Diretório onde os PDFs serão salvos
+        """
         self.output_dir = output_dir
-        os.makedirs(output_dir, exist_ok=True)
+        self._ensure_output_dir()
     
-    @contextlib.contextmanager
-    def _suppress_warnings(self):
-        """
-        Context manager para suprimir avisos do WeasyPrint no Windows.
-        Redireciona temporariamente stderr para suprimir mensagens de GLib-GIO-WARNING.
-        """
-        if sys.platform.startswith('win'):
-            # No Windows, capturamos stderr para suprimir avisos do GLib
-            original_stderr = sys.stderr
-            sys.stderr = StringIO()
-            try:
-                yield
-            finally:
-                sys.stderr = original_stderr
-        else:
-            # Em outros sistemas, não fazemos nada
-            yield
+    def _ensure_output_dir(self):
+        """Garante que o diretório de saída existe."""
+        os.makedirs(self.output_dir, exist_ok=True)
     
-    def generate_pdf(self, html_content, output_path=None, orientation='landscape'):
+    def generate_pdf(self, html_content, output_path=None, orientation="portrait"):
         """
-        Gera um PDF a partir de conteúdo HTML usando WeasyPrint.
-        Se output_path for None, retorna os bytes do PDF.
-        Caso contrário, salva o PDF no caminho especificado.
+        Gera um PDF a partir de conteúdo HTML.
         
         Args:
             html_content (str): Conteúdo HTML para converter
-            output_path (str, opcional): Caminho para salvar o PDF
-            orientation (str, opcional): Orientação do PDF ('portrait' ou 'landscape')
+            output_path (str, optional): Caminho completo para salvar o PDF
+            orientation (str): Orientação da página ('portrait' ou 'landscape')
         
         Returns:
-            bytes ou str: Bytes do PDF ou caminho do arquivo salvo
+            bytes ou str: Bytes do PDF se output_path não fornecido, senão caminho do arquivo
+        
+        Raises:
+            RuntimeError: Se houver erro na geração do PDF
         """
         try:
-            # Configuração de fontes para WeasyPrint
-            font_config = FontConfiguration()
-            
-            # Definir orientação e tamanho da página
-            page_size = 'A4 landscape' if orientation == 'landscape' else 'A4 portrait'
-            # CSS para definir orientação da página, margens e garantir posicionamento correto
-            css_content = f"""
-                @page {{
-                    size: {page_size};
-                    margin: 0;  /* Removendo margens para evitar deslocamento */
-                }}
-                body {{
-                    font-family: Arial, sans-serif;
-                    margin: 0;
-                    padding: 0;
-                    position: relative;
-                }}
-                /* Certificar que elementos com posição absoluta sejam renderizados corretamente */
-                .qr-placeholder {{
-                    position: absolute !important;
-                    /* Não alterar tamanho ou margem */
-                    box-sizing: border-box !important;
-                }}
-                /* Garantir que as imagens dentro dos placeholders mantenham dimensões exatas */
-                .qr-placeholder img {{
-                    width: 100% !important;
-                    height: 100% !important;
-                    display: block !important;
-                    margin: 0 !important;
-                    padding: 0 !important;
-                    object-fit: contain !important;
-                }}
+            # Configurar CSS para orientação (sem sobrescrever margin se já definido)
+            css_string = f"""
+            @page {{
+                size: A4 {orientation};
+            }}
             """
             
-            # Criar objetos HTML e CSS
-            html_doc = HTML(string=html_content)
-            css_doc = CSS(string=css_content)
-              # Se não houver caminho de saída, retorna os bytes
-            if output_path is None:
-                pdf_buffer = BytesIO()
-                with self._suppress_warnings():
-                    html_doc.write_pdf(pdf_buffer, stylesheets=[css_doc], font_config=font_config)
-                pdf_data = pdf_buffer.getvalue()
-                pdf_buffer.close()
-                return pdf_data
-            else:
-                # Se tiver caminho de saída, salva o arquivo
-                with self._suppress_warnings():
-                    html_doc.write_pdf(output_path, stylesheets=[css_doc], font_config=font_config)
+            # Criar documento HTML e CSS
+            html_doc = weasyprint.HTML(string=html_content)
+            
+            # Aplicar CSS apenas se necessário (não sobrescrever estilos do template)
+            stylesheets = []
+            if not '@page' in html_content:
+                css_doc = weasyprint.CSS(string=css_string)
+                stylesheets.append(css_doc)
+            
+            if output_path:
+                # Garantir que o diretório pai existe
+                os.makedirs(os.path.dirname(output_path), exist_ok=True)
+                
+                html_doc.write_pdf(output_path, stylesheets=stylesheets)
                 return output_path
+            else:
+                # Gerar PDF em memória
+                return html_doc.write_pdf(stylesheets=stylesheets)
                 
         except Exception as e:
             raise RuntimeError(f"Erro ao gerar PDF: {str(e)}")
     
-    def batch_generate(self, html_contents, file_names, orientation='landscape'):
+    def batch_generate(self, html_contents, file_names, orientation="portrait", use_multiprocessing=False, max_workers=None):
         """
-        Gera múltiplos PDFs a partir de uma lista de conteúdos HTML.
-        Retorna uma lista de caminhos para os PDFs gerados.
-        
-        Nota: file_names deve conter os caminhos completos para os arquivos de saída.
+        Gera múltiplos PDFs em lote.
         
         Args:
             html_contents (list): Lista de conteúdos HTML
-            file_names (list): Lista de caminhos para salvar os PDFs
-            orientation (str, opcional): Orientação dos PDFs ('portrait' ou 'landscape')
-            
+            file_names (list): Lista de caminhos de arquivo para salvar os PDFs
+            orientation (str): Orientação da página ('portrait' ou 'landscape')
+            use_multiprocessing (bool): Se deve usar processamento paralelo (padrão: False)
+            max_workers (int, optional): Número máximo de workers paralelos
+        
         Returns:
-            list: Lista de caminhos dos PDFs gerados
+            list: Lista de caminhos dos PDFs gerados com sucesso
+        
+        Raises:
+            ValueError: Se o número de conteúdos HTML não corresponder ao número de nomes de arquivo
         """
         if len(html_contents) != len(file_names):
-            raise ValueError("O número de conteúdos HTML e nomes de arquivo deve ser igual")
-
-        # Helper function to be called by ProcessPoolExecutor
-        # It needs to be defined here or be a static method or top-level function
-        # to be picklable by some serializers.
-        # However, instance methods are generally picklable if the instance itself is.
-        # Let's try with an instance method first.
+            raise ValueError("O número de conteúdos HTML deve corresponder ao número de nomes de arquivo")
         
-        # Prepare arguments for each call to self.generate_pdf
-        # We need to ensure that if self.generate_pdf itself relies on instance state
-        # that isn't picklable, this won't work.
-        # generate_pdf uses self._suppress_warnings. The method itself should be fine.
+        # Garantir que todos os caminhos são absolutos e criar diretórios pai
+        full_paths = []
+        for file_name in file_names:
+            if not os.path.isabs(file_name):
+                full_path = os.path.join(self.output_dir, file_name)
+            else:
+                full_path = file_name
+            
+            os.makedirs(os.path.dirname(full_path), exist_ok=True)
+            full_paths.append(full_path)
         
-        results = []
-        # Using os.cpu_count() for the number of workers
-        # Ensure ProcessPoolExecutor is properly managed using a 'with' statement
-        with ProcessPoolExecutor(max_workers=os.cpu_count()) as executor:
-            # Create a list of arguments for each task
-            # Each item in tasks will be (html_content, output_path, orientation)
-            tasks_args = []
-            for i, html_content in enumerate(html_contents):
-                file_path = file_names[i] # file_names contains full paths
-                tasks_args.append((html_content, file_path, orientation))
-
-            # Define a wrapper function that can be pickled and used by executor.map
-            # This wrapper will call the instance method.
-            # This is one way to ensure picklability and manage arguments.
-            def _execute_generate_pdf(task_arg_tuple):
-                # Unpack arguments and call the instance method
-                # self here refers to the PDFGenerator instance
+        generated_files = []
+        
+        # Usar processamento sequencial por padrão (mais estável no Windows)
+        if not use_multiprocessing:
+            for html_content, output_path in zip(html_contents, full_paths):
                 try:
-                    return self.generate_pdf(task_arg_tuple[0], task_arg_tuple[1], task_arg_tuple[2])
+                    result_path = self.generate_pdf(html_content, output_path, orientation)
+                    generated_files.append(result_path)
                 except Exception as e:
-                    # Log error or handle as per requirements
-                    # For now, we'll let it propagate to be caught by the caller of map,
-                    # or collected if we iterate over futures.
-                    # To make it more robust and allow other tasks to complete,
-                    # we'd typically catch, log, and return a specific error marker.
-                    # For this iteration, the error will be raised when results are consumed.
-                    print(f"Error generating PDF for {task_arg_tuple[1]}: {e}", file=sys.stderr) # Basic logging
-                    return e # Return the exception itself to indicate failure for this task
-
+                    print(f"Erro ao gerar PDF para {output_path}: {e}", file=sys.stderr)
+                    continue
+        else:
+            # Usar processamento paralelo apenas se explicitamente solicitado
+            tasks = [(html_content, output_path, orientation) 
+                    for html_content, output_path in zip(html_contents, full_paths)]
+            
+            # Determinar número de workers
+            if max_workers is None:
+                max_workers = min(2, os.cpu_count() or 1)  # Reduzido para evitar sobrecarga
+            
             try:
-                # executor.map executes the calls in parallel
-                # Results will be in the order of the input iterables
-                # If an exception occurs in one of the calls, it will be raised when iterating results
-                # or when calling list() on map_results.
-                map_results = executor.map(_execute_generate_pdf, tasks_args)
+                # Suprimir warnings do GLib no Windows
+                if sys.platform.startswith('win'):
+                    import warnings
+                    warnings.filterwarnings("ignore", category=UserWarning)
                 
-                # Collect results, handling potential exceptions from individual tasks
-                for result in map_results:
-                    if isinstance(result, Exception):
-                        # Log or collect errors; for now, just print and add None or raise
-                        # Depending on strictness, we might raise here, or collect all paths
-                        # and report errors separately.
-                        # The subtask says "logged or reported without crashing the entire batch process"
-                        # Returning the exception from the worker and then printing it here
-                        # and not adding to pdf_paths achieves part of that.
-                        # The overall batch won't crash if we just collect paths of successful operations.
-                        print(f"A PDF generation failed: {result}", file=sys.stderr)
-                        # results.append(None) # Or some other marker for failure
-                    else:
-                        results.append(result) # result here is the output_path from generate_pdf
-
+                with ProcessPoolExecutor(max_workers=max_workers) as executor:
+                    # Submeter todas as tarefas
+                    future_to_path = {
+                        executor.submit(_execute_generate_pdf_task, task): task[1] 
+                        for task in tasks
+                    }
+                    
+                    # Coletar resultados
+                    for future in as_completed(future_to_path):
+                        output_path = future_to_path[future]
+                        try:
+                            result_path = future.result()
+                            generated_files.append(result_path)
+                        except Exception as e:
+                            print(f"Erro ao gerar PDF para {output_path}: {e}", file=sys.stderr)
+                            continue
+                            
             except Exception as e:
-                # This would catch errors from executor.map itself (e.g., if a worker process dies)
-                # or if _execute_generate_pdf re-raised an exception not caught by its own try-except.
-                # For now, let the exception propagate to the caller of batch_generate.
-                # A more sophisticated error handling strategy might be needed for production.
-                print(f"An unexpected error occurred during batch PDF generation: {e}", file=sys.stderr)
-                # Depending on requirements, we might re-raise, or return partial results.
-                raise # Re-raise the first exception encountered by map or executor issue
-
-        # Filter out any None results if we decided to add them for errors
-        pdf_paths = [path for path in results if path is not None and not isinstance(path, Exception)]
-        return pdf_paths
+                print(f"Erro durante geração em lote multiprocesso: {e}", file=sys.stderr)
+                print("Voltando para processamento sequencial...", file=sys.stderr)
+                # Fallback para processamento sequencial
+                generated_files = []
+                for html_content, output_path in zip(html_contents, full_paths):
+                    try:
+                        result_path = self.generate_pdf(html_content, output_path, orientation)
+                        generated_files.append(result_path)
+                    except Exception as individual_error:
+                        print(f"Erro individual ao gerar PDF para {output_path}: {individual_error}", file=sys.stderr)
+                        continue
+        
+        return generated_files
     
     def clean_output_directory(self):
-        """Limpa todos os arquivos do diretório de saída"""
-        for file in os.listdir(self.output_dir):
-            file_path = os.path.join(self.output_dir, file)
-            if os.path.isfile(file_path):
-                os.remove(file_path)
+        """Remove todos os arquivos do diretório de saída, mantendo subdiretórios."""
+        if os.path.exists(self.output_dir):
+            for filename in os.listdir(self.output_dir):
+                file_path = os.path.join(self.output_dir, filename)
+                if os.path.isfile(file_path):
+                    try:
+                        os.remove(file_path)
+                    except OSError:
+                        pass  # Ignorar erros de remoção
