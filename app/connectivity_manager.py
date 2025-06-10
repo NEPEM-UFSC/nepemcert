@@ -4,9 +4,9 @@ Módulo para gerenciamento de conectividade com servidor remoto.
 
 import os
 import json
-import time # Keep for potential future use, though direct sleeps are removed
+import time
 from datetime import datetime
-import requests # Import requests library
+import requests
 
 class ConnectivityManager:
     def __init__(self, config_dir="config"):
@@ -16,7 +16,7 @@ class ConnectivityManager:
         self.load_config()
 
         self.session = requests.Session()
-        self.session.headers.update({"User-Agent": "NEPEMCertCLI/1.1.0"}) # Good practice to set User-Agent
+        self.session.headers.update({"User-Agent": "NEPEMCertCLI/1.1.0"})
         if self.config.get("api_key"):
             self.session.headers.update({"X-API-Key": self.config["api_key"]})
     
@@ -30,7 +30,7 @@ class ConnectivityManager:
                 self.config = self._get_default_config()
         else:
             self.config = self._get_default_config()
-            self.save_config() # Save defaults if no config file exists
+            self.save_config()
     
     def save_config(self):
         """Salva as configurações de conectividade no arquivo."""
@@ -42,8 +42,8 @@ class ConnectivityManager:
         return {
             "server_url": "",
             "api_key": "",
-            "username": "", # Retained for future auth strategies
-            "password": "", # Retained for future auth strategies
+            "username": "",
+            "password": "",
             "last_connection": None,
             "connection_status": "Desconectado",
             "auto_sync": False,
@@ -90,7 +90,7 @@ class ConnectivityManager:
             self.config["connection_status"] = "Desconectado"
             message = f"Falha na conexão: {str(e)}"
         except json.JSONDecodeError:
-            self.config["connection_status"] = "Desconectado" # Or "Erro" if connected but invalid response
+            self.config["connection_status"] = "Desconectado" #
             message = "Falha ao decodificar JSON da resposta do servidor."
         
         self.config["last_connection"] = timestamp
