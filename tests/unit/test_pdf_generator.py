@@ -125,12 +125,43 @@ def test_batch_generate(pdf_generator, sample_html, tmp_path):
         assert os.path.getsize(path) > 100
 
 def test_batch_generate_error(pdf_generator, sample_html):
-    """Testa erro no método batch_generate quando há tamanhos diferentes"""
+    """Testa o método batch_generate com erro (número de arquivos e HTMLs diferente)"""
     html_contents = [sample_html, sample_html]
-    file_names = ["certificado1.pdf"]
+    file_names = ["certificado1.pdf"] # Apenas um nome de arquivo
     
     with pytest.raises(ValueError):
         pdf_generator.batch_generate(html_contents, file_names)
+
+def test_generate_pdf_error(pdf_generator, monkeypatch):
+    """Testa o método generate_pdf quando ocorre um erro na geração"""
+    # Mock para simular erro na escrita do PDF
+    def mock_write_pdf(*args, **kwargs):
+        raise Exception("Erro simulado na escrita do PDF")
+
+    monkeypatch.setattr("weasyprint.HTML.write_pdf", mock_write_pdf)
+    
+    with pytest.raises(RuntimeError) as excinfo:
+        pdf_generator.generate_pdf("<html></html>", "dummy.pdf")
+    assert "Erro ao gerar PDF: Erro simulado na escrita do PDF" in str(excinfo.value)
+
+def test_clean_output_directory(pdf_generator, tmp_path):
+    """Testa o método clean_output_directory"""
+    # Configurar o diretório de saída para tmp_path
+    pdf_generator.output_dir = str(tmp_path)
+    
+    # Criar alguns arquivos no diretório de saída
+    (tmp_path / "file1.pdf").touch()
+    (tmp_path / "file2.txt").touch()
+    (tmp_path / "subdir").mkdir()
+    (tmp_path / "subdir" / "file3.pdf").touch()
+
+    pdf_generator.clean_output_directory()
+    
+    # Verificar se os arquivos foram removidos, mas o subdiretório não
+    assert not (tmp_path / "file1.pdf").exists()
+    assert not (tmp_path / "file2.txt").exists()
+    assert (tmp_path / "subdir").exists() # clean_output_directory só remove arquivos
+    assert (tmp_path / "subdir" / "file3.pdf").exists()
 
 @pytest.mark.cli
 def test_cli_pdf_generation(cli_pdf_generator, sample_html):

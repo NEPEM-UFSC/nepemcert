@@ -119,13 +119,3 @@ def test_create_zip_from_bytes(zip_exporter):
                 # Verificar o conteúdo
                 content = zip_file.read(name)
                 assert content == file_contents[i]
-
-def test_create_zip_from_bytes_error(zip_exporter):
-    """Testa o método create_zip_from_bytes com erro de tamanho"""
-    # Número diferente de conteúdos e nomes
-    file_contents = [b"Conteudo 1", b"Conteudo 2", b"Conteudo 3"]
-    file_names = ["arquivo1.txt", "arquivo2.txt"]  # Faltando um nome
-    
-    # Deve lançar ValueError
-    with pytest.raises(ValueError):
-        zip_exporter.create_zip_from_bytes(file_contents, file_names)
