@@ -399,19 +399,3 @@ class ThemeManager:
             print(f"Erro ao carregar imagem de fundo: {e}")
             return False
 
-# Ensure re is available if any other part of the application (not shown here)
-# or future modifications to this class might rely on it being imported at the module level.
-# For now, it's not strictly needed by the refactored ThemeManager class itself.
-# However, other utility functions or parts of the app might expect 're' from this module.
-# Given it was there before, and slugify (though external) often uses regex,
-# it's safer to keep it if unsure about all usages importing it directly.
-# For this specific refactoring, ThemeManager itself doesn't need re anymore.
-# If slugify is truly the only user and it's self-contained or imports re itself,
-# then `import re` could be removed. Let's assume it's safer to keep for now.
-# Final decision: Keep `import re` as it was present and might be used by other parts implicitly.
-# Update: `slugify` is an external library and would handle its own imports.
-# `re` is not used by the `ThemeManager` class after this refactoring.
-# So, `import re` can be removed from the top of this file.
-# I will remove it in the final code block.
-# (Self-correction: The overwrite block should reflect the final desired state.
-# I will remove 'import re' from the top of the file in the overwrite block below.)
