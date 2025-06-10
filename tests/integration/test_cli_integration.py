@@ -356,7 +356,7 @@ def test_complete_certificate_generation_flow(temp_workspace):
         # Mesclar dados com parâmetros
         final_data = param_manager.merge_placeholders(participant_data)
         
-        # Gerar QR code
+        # Gerar QR code - usar método correto
         qr_base64 = auth_manager.gerar_qrcode_base64(auth_code)
         
         # Renderizar template

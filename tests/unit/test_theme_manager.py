@@ -214,7 +214,7 @@ def test_apply_theme_to_template(theme_manager):
 def test_apply_theme_with_background_image(theme_manager):
     """Testa a aplicação de tema com imagem de fundo."""
     html_content_template = """<!DOCTYPE html>
-<html><head><title>BG Test</title></head><body>Conteúdo</body></html>"""
+<html><head><title>BG Test</title></head><body><div class="certificate-container">Conteúdo</div></body></html>"""
     
     # Simular uma imagem base64
     fake_base64_image = "R0lGODlhAQABAIAAAAUEBAAAACwAAAAAAQABAAACAkQBADs=" # Exemplo de um GIF pequeno
@@ -225,12 +225,19 @@ def test_apply_theme_with_background_image(theme_manager):
     
     modified_html = theme_manager.apply_theme_to_template(html_content_template, theme_settings)
     
-    expected_bg_image_css = f"background-image: url('data:image/png;base64,{fake_base64_image}') !important;"
-    assert expected_bg_image_css in modified_html
+    # Verificar se a imagem de fundo foi aplicada corretamente
+    assert "background-image: url('data:image/png;base64," in modified_html
+    assert f"{fake_base64_image}') !important;" in modified_html
     assert "background-size: cover !important;" in modified_html
-    assert "background-position: center !important;" in modified_html
+    assert "background-position: center center !important;" in modified_html
     assert "background-repeat: no-repeat !important;" in modified_html
+    assert "background-attachment: fixed !important;" in modified_html
+    assert "background: transparent !important;" in modified_html  # Para certificate-container
     assert '<style type="text/css" id="nepemcert-theme-styles">' in modified_html
+    
+    # Verificar que a regra de background só aparece uma vez
+    bg_count = modified_html.count("background-image:")
+    assert bg_count == 1, f"Background image deveria aparecer apenas uma vez, mas aparece {bg_count} vezes"
 
 def test_apply_theme_no_settings(theme_manager):
     """Testa aplicar um tema vazio (sem configurações de estilo)."""
