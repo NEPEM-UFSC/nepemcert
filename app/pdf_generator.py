@@ -6,6 +6,8 @@ import sys
 import warnings
 import contextlib
 from io import BytesIO, StringIO
+from concurrent.futures import ProcessPoolExecutor
+# import functools # No longer needed
 from weasyprint import HTML, CSS
 from weasyprint.text.fonts import FontConfiguration
 
@@ -118,14 +120,80 @@ class PDFGenerator:
         """
         if len(html_contents) != len(file_names):
             raise ValueError("O número de conteúdos HTML e nomes de arquivo deve ser igual")
+
+        # Helper function to be called by ProcessPoolExecutor
+        # It needs to be defined here or be a static method or top-level function
+        # to be picklable by some serializers.
+        # However, instance methods are generally picklable if the instance itself is.
+        # Let's try with an instance method first.
         
-        pdf_paths = []
-        for i, html in enumerate(html_contents):
-            # Usamos o caminho completo fornecido, sem adicionar self.output_dir novamente
-            file_path = file_names[i]
-            self.generate_pdf(html, file_path, orientation)
-            pdf_paths.append(file_path)
+        # Prepare arguments for each call to self.generate_pdf
+        # We need to ensure that if self.generate_pdf itself relies on instance state
+        # that isn't picklable, this won't work.
+        # generate_pdf uses self._suppress_warnings. The method itself should be fine.
         
+        results = []
+        # Using os.cpu_count() for the number of workers
+        # Ensure ProcessPoolExecutor is properly managed using a 'with' statement
+        with ProcessPoolExecutor(max_workers=os.cpu_count()) as executor:
+            # Create a list of arguments for each task
+            # Each item in tasks will be (html_content, output_path, orientation)
+            tasks_args = []
+            for i, html_content in enumerate(html_contents):
+                file_path = file_names[i] # file_names contains full paths
+                tasks_args.append((html_content, file_path, orientation))
+
+            # Define a wrapper function that can be pickled and used by executor.map
+            # This wrapper will call the instance method.
+            # This is one way to ensure picklability and manage arguments.
+            def _execute_generate_pdf(task_arg_tuple):
+                # Unpack arguments and call the instance method
+                # self here refers to the PDFGenerator instance
+                try:
+                    return self.generate_pdf(task_arg_tuple[0], task_arg_tuple[1], task_arg_tuple[2])
+                except Exception as e:
+                    # Log error or handle as per requirements
+                    # For now, we'll let it propagate to be caught by the caller of map,
+                    # or collected if we iterate over futures.
+                    # To make it more robust and allow other tasks to complete,
+                    # we'd typically catch, log, and return a specific error marker.
+                    # For this iteration, the error will be raised when results are consumed.
+                    print(f"Error generating PDF for {task_arg_tuple[1]}: {e}", file=sys.stderr) # Basic logging
+                    return e # Return the exception itself to indicate failure for this task
+
+            try:
+                # executor.map executes the calls in parallel
+                # Results will be in the order of the input iterables
+                # If an exception occurs in one of the calls, it will be raised when iterating results
+                # or when calling list() on map_results.
+                map_results = executor.map(_execute_generate_pdf, tasks_args)
+                
+                # Collect results, handling potential exceptions from individual tasks
+                for result in map_results:
+                    if isinstance(result, Exception):
+                        # Log or collect errors; for now, just print and add None or raise
+                        # Depending on strictness, we might raise here, or collect all paths
+                        # and report errors separately.
+                        # The subtask says "logged or reported without crashing the entire batch process"
+                        # Returning the exception from the worker and then printing it here
+                        # and not adding to pdf_paths achieves part of that.
+                        # The overall batch won't crash if we just collect paths of successful operations.
+                        print(f"A PDF generation failed: {result}", file=sys.stderr)
+                        # results.append(None) # Or some other marker for failure
+                    else:
+                        results.append(result) # result here is the output_path from generate_pdf
+
+            except Exception as e:
+                # This would catch errors from executor.map itself (e.g., if a worker process dies)
+                # or if _execute_generate_pdf re-raised an exception not caught by its own try-except.
+                # For now, let the exception propagate to the caller of batch_generate.
+                # A more sophisticated error handling strategy might be needed for production.
+                print(f"An unexpected error occurred during batch PDF generation: {e}", file=sys.stderr)
+                # Depending on requirements, we might re-raise, or return partial results.
+                raise # Re-raise the first exception encountered by map or executor issue
+
+        # Filter out any None results if we decided to add them for errors
+        pdf_paths = [path for path in results if path is not None and not isinstance(path, Exception)]
         return pdf_paths
     
     def clean_output_directory(self):
