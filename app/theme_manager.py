@@ -402,8 +402,15 @@ class ThemeManager:
             
             # Garantir que elementos filhos sejam transparentes para mostrar o background
             css_rules.append(f"""
-                .certificate-container {{
+                .certificate-container, .title, .content, .signature, .footer, #qr-code-placeholder {{
                     background: transparent !important;
+                }}
+            """.strip())
+            
+            # Ajustar text-shadow para melhor legibilidade sobre backgrounds
+            css_rules.append(f"""
+                .title, .content, .participant-name, .event-name, .signature, .footer {{
+                    text-shadow: 1px 1px 3px rgba(255, 255, 255, 0.9), -1px -1px 3px rgba(255, 255, 255, 0.9) !important;
                 }}
             """.strip())
         
