@@ -44,9 +44,11 @@
             margin-bottom: 20px;
             text-transform: uppercase;
             letter-spacing: 3px;
-            background: rgba(255, 255, 255, 0.9);
+            /* Removido background para ficar transparente */
             padding: 10px;
             border-radius: 5px;
+            /* Adicionar sombra de texto para melhor legibilidade */
+            text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.8);
         }
         
         .content {
@@ -57,8 +59,10 @@
             text-indent: 30px;
             color: #333333;
             padding: 20px 40px;
-            background: rgba(255, 255, 255, 0.95);
+            /* Removido background para ficar transparente */
             border-radius: 10px;
+            /* Adicionar sombra de texto para melhor legibilidade */
+            text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.8);
         }
         
         .participant-name {
@@ -69,11 +73,15 @@
             padding-bottom: 3px;
             margin: 0 8px;
             display: inline-block;
+            /* Adicionar sombra de texto para melhor legibilidade */
+            text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.8);
         }
         
         .event-name {
             font-weight: bold;
             color: #1a5276;
+            /* Adicionar sombra de texto para melhor legibilidade */
+            text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.8);
         }
         
         .signatures-container {
@@ -89,9 +97,11 @@
         .signature {
             text-align: center;
             width: 200px;
-            background: rgba(255, 255, 255, 0.9);
+            /* Removido background para ficar transparente */
             padding: 10px;
             border-radius: 5px;
+            /* Adicionar sombra de texto para melhor legibilidade */
+            text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.8);
         }
         
         .signature-line {
@@ -122,9 +132,11 @@
             text-align: center;
             color: #666;
             line-height: 1.4;
-            background: rgba(255, 255, 255, 0.9);
+            /* Removido background para ficar transparente */
             padding: 10px;
             border-radius: 5px;
+            /* Adicionar sombra de texto para melhor legibilidade */
+            text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.8);
         }
         
         .verification-info {
@@ -149,14 +161,16 @@
         
         #qr-code-placeholder {
             position: absolute;
-            bottom: 80px;
-            left: 80px;
-            width: 90px;
-            height: 90px;
-            background: rgba(255, 255, 255, 0.9);
+            bottom: 110px;
+            left: 110px;
+            width: 120px;
+            height: 120px;
+            /* Removido background para ficar transparente */
             border-radius: 5px;
             padding: 5px;
             box-sizing: border-box;
+            /* Adicionar uma sombra sutil ao QR code para destacá-lo */
+            filter: drop-shadow(2px 2px 4px rgba(0, 0, 0, 0.3));
         }
     </style>
 </head>
