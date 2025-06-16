@@ -12,6 +12,7 @@ NEPEMCERT é uma aplicação CLI (Command Line Interface) desenvolvida em Python
 - 🔧 Configuração flexível de placeholders
 - 📦 Exportação em arquivo ZIP
 - 🖥️ Interface CLI interativa e amigável
+- 🔐 Sistema de autenticação seguro com keyring
 - 🔗 Integração com servidor para autenticação (em desenvolvimento)
 
 ## Stack Técnico
@@ -38,12 +39,12 @@ tabulate==0.9.0        # Formatação de tabelas
 tqdm==4.67.1           # Barras de progresso
 colorama==0.4.6        # Cores no terminal
 pydantic==2.11.5       # Validação de dados
+keyring>=24.0.0        # Armazenamento seguro de credenciais
 ```
 
 ### Ambiente de Desenvolvimento
-- **Editor**: Visual Studio Code ou PyCharm
+- **Editor**: Visual Studio Code
 - **Sistema Operacional**: Windows, Linux ou macOS
-- **Ambiente Virtual**: Altamente recomendado
 
 ## Arquitetura do Sistema
 
@@ -61,6 +62,7 @@ nepemcert/
 │   ├── csv_manager.py            # Processamento de CSV
 │   ├── field_mapper.py           # Mapeamento de campos
 │   ├── zip_exporter.py           # Exportação ZIP
+│   ├── auth_manager.py           # Gerenciamento de autenticação
 │   └── connectivity_manager.py   # Conexões remotas
 ├── templates/                    # Templates HTML
 ├── uploads/                      # Arquivos CSV
@@ -96,6 +98,56 @@ nepemcert/
 - **Arquivo**: `app/theme_manager.py`
 - **Responsabilidade**: Aplicação de estilos e temas
 - **Tecnologias**: CSS, JSON
+
+#### 6. Gerenciador de Autenticação
+- **Arquivo**: `app/auth_manager.py`
+- **Responsabilidade**: Geração e gerenciamento de credenciais de acesso
+- **Tecnologias**: keyring, secrets, uuid, Pydantic
+
+## Sistema de Autenticação
+
+### Funcionalidades
+
+O sistema de autenticação oferece:
+
+1. **Geração de Chave Única**
+   - Chave criptográfica de 256 bits
+   - ID único de instalação
+   - Timestamp de criação
+
+2. **Armazenamento Seguro**
+   - Chaves armazenadas no keyring do sistema
+   - Metadados não-sensíveis em arquivo local
+   - Validação com Pydantic
+
+3. **Autenticação com Servidor**
+   - Headers Authorization Bearer
+   - Identificação única do cliente
+   - Controle de expiração
+
+### Configuração Inicial
+
+```bash
+# Configurar credenciais pela primeira vez
+python nepemcert.py auth setup
+
+# Verificar status de autenticação
+python nepemcert.py auth status
+
+# Regenerar credenciais
+python nepemcert.py auth setup --force
+```
+
+### Estrutura de Credenciais
+
+```json
+{
+    "client_id": "nepemcert_12345678-1234-1234-1234-123456789abc",
+    "installation_id": "87654321-4321-4321-4321-cba987654321",
+    "created_at": "2024-01-15T10:30:00",
+    "last_used": "2024-01-20T14:45:00"
+}
+```
 
 ## Sistema de Placeholders
 
@@ -253,6 +305,13 @@ python nepemcert.py interactive
 python nepemcert.py generate <csv_file> <template> --output <output_dir> --zip
 ```
 
+### Autenticação
+```bash
+python nepemcert.py auth setup          # Configurar credenciais
+python nepemcert.py auth status         # Verificar status
+python nepemcert.py auth revoke         # Revogar credenciais
+```
+
 ### Verificação do Servidor
 ```bash
 python nepemcert.py server --status
@@ -262,6 +321,7 @@ python nepemcert.py server --status
 ```bash
 python nepemcert.py --help
 python nepemcert.py generate --help
+python nepemcert.py auth --help
 ```
 
 ## Formato de Templates
