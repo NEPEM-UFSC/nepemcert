@@ -19,7 +19,7 @@ import qrcode
 from PIL import Image
 import sqlite3
 
-class AuthenticationManager:
+class CertAuthenticationManager:
     """
     Gerenciador de códigos de autenticação para certificados.
     
@@ -339,7 +339,7 @@ class AuthenticationManager:
 
 if __name__ == "__main__":
     # Exemplo de uso
-    auth_manager = AuthenticationManager()
+    auth_manager =CertAuthenticationManager()
     
     # Gera um código de autenticação
     codigo = auth_manager.gerar_codigo_autenticacao(

@@ -7,7 +7,7 @@ import jinja2 # Added for direct string template rendering
 from .csv_manager import CSVManager
 from .template_manager import TemplateManager
 from .pdf_generator import PDFGenerator
-from .authentication_manager import AuthenticationManager
+from .cert_auth_manager import CertAuthenticationManager
 from .parameter_manager import ParameterManager
 from .theme_manager import ThemeManager
 
@@ -17,7 +17,7 @@ class CertificateService:
         self.csv_manager = CSVManager()
         self.template_manager = TemplateManager()
         self.pdf_generator = PDFGenerator(output_dir=output_dir)
-        self.auth_manager = AuthenticationManager()
+        self.auth_manager =CertAuthenticationManager()
         self.parameter_manager = ParameterManager()
         self.theme_manager = ThemeManager()
         self.output_dir = output_dir
