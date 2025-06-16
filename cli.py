@@ -115,7 +115,7 @@ from app.zip_exporter import ZipExporter
 from app.connectivity_manager import ConnectivityManager
 from app.parameter_manager import ParameterManager
 from app.theme_manager import ThemeManager
-from app.authentication_manager import AuthenticationManager
+from app.cert_auth_manager import AuthenticationManager
 from app.certificate_service import CertificateService # Added CertificateService import
 
 # Configuração do console Rich
@@ -2302,7 +2302,7 @@ def debug_generate_certificate_for_theme(tema_nome):
         from app.theme_manager import ThemeManager
         from app.pdf_generator import PDFGenerator
         from app.parameter_manager import ParameterManager
-        from app.authentication_manager import AuthenticationManager
+        from app.cert_auth_manager import AuthenticationManager
         
         # Inicializar gerenciadores
         template_manager = TemplateManager()

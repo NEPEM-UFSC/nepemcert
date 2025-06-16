@@ -276,7 +276,7 @@ def test_complete_certificate_generation_flow(temp_workspace):
     from app.template_manager import TemplateManager
     from app.pdf_generator import PDFGenerator
     from app.parameter_manager import ParameterManager
-    from app.authentication_manager import AuthenticationManager
+    from app.cert_auth_manager import AuthenticationManager
     from app.field_mapper import FieldMapper
     from app.zip_exporter import ZipExporter
     

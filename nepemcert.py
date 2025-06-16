@@ -237,7 +237,7 @@ def debug_themes(template, output, zip):
     from app.parameter_manager import ParameterManager
     from app.template_manager import TemplateManager
     from app.theme_manager import ThemeManager
-    from app.authentication_manager import AuthenticationManager
+    from app.cert_auth_manager import AuthenticationManager
     
     console.print(f"[bold blue]🐛 DEBUG: Gerando certificados com todos os temas...[/bold blue]")
     console.print(f"- Template: [cyan]{template}[/cyan]")

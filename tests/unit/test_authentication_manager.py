@@ -13,7 +13,7 @@ from pathlib import Path
 # Adicionar o diretório raiz do projeto ao sys.path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
-from app.authentication_manager import AuthenticationManager
+from app.cert_auth_manager import AuthenticationManager
 
 class TestAuthenticationManager(unittest.TestCase):
 

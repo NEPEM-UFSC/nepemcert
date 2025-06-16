@@ -138,7 +138,7 @@ def managers(tmp_path):
     from app.zip_exporter import ZipExporter
     from app.parameter_manager import ParameterManager
     from app.theme_manager import ThemeManager
-    from app.authentication_manager import AuthenticationManager
+    from app.cert_auth_manager import AuthenticationManager
     from app.field_mapper import FieldMapper
 
     # Criar diretórios temporários para cada gerenciador
