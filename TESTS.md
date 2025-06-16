@@ -44,6 +44,9 @@ python run_tests.py --cli
 # Executar testes do módulo de conectividade
 python run_tests.py --module connectivity_manager
 
+# Executar testes do módulo de autenticação
+python run_tests.py --module auth_manager
+
 # Executar testes de unidade da interface CLI com cobertura
 python run_tests.py --unit --cli --coverage
 ```
@@ -51,6 +54,7 @@ python run_tests.py --unit --cli --coverage
 ## Estrutura dos testes
 
 - `tests/unit/`: Testes de unidade para componentes individuais
+  - `test_auth_manager.py`: Testes para o gerenciador de autenticação
   - `test_connectivity_manager.py`: Testes para o gerenciador de conectividade
   - `test_csv_manager.py`: Testes para o gerenciador de CSV
   - `test_field_mapper.py`: Testes para o mapeamento de campos
@@ -71,6 +75,7 @@ Os testes utilizam marcadores do pytest para melhor organização:
 - `@pytest.mark.integration`: Testes de integração
 - `@pytest.mark.slow`: Testes que são lentos para executar
 - `@pytest.mark.cli`: Testes relacionados à interface CLI
+- `@pytest.mark.core`: Testes dos módulos principais
 
 ## Cobertura de testes
 
@@ -83,8 +88,58 @@ Para executar um arquivo de teste específico usando pytest diretamente:
 
 ```bash
 # Executar um arquivo de teste específico
-pytest -v tests/unit/test_connectivity_manager.py
+pytest -v tests/unit/test_auth_manager.py
 
 # Executar uma função de teste específica
-pytest -v tests/unit/test_cli_commands.py::test_cli_help
+pytest -v tests/unit/test_auth_manager.py::TestAuthManager::test_setup_client_new
+
+# Executar apenas testes do módulo de autenticação
+pytest -v tests/unit/test_auth_manager.py -m "unit and core"
 ```
+
+## Testes do Módulo de Autenticação
+
+O módulo `test_auth_manager.py` inclui testes abrangentes para:
+
+### ClientCredentials
+- Validação de credenciais válidas e inválidas
+- Verificação de tamanhos mínimos para IDs e chaves
+- Tratamento de valores vazios
+
+### AuthConfig
+- Configurações padrão e personalizadas
+- Validação de parâmetros de configuração
+
+### AuthManager
+- Geração de chaves criptográficas únicas
+- Armazenamento seguro com keyring (mockado)
+- Carregamento de credenciais existentes
+- Autenticação com servidor
+- Gerenciamento de headers HTTP
+- Verificação de expiração de credenciais
+- Revogação de credenciais
+- Informações do cliente
+
+### Funções de Conveniência
+- `setup_authentication()`
+- `get_auth_headers()`
+- `is_client_authenticated()`
+
+### Tratamento de Erros
+- `AuthenticationError` em diversos cenários
+- Falhas no keyring
+- Arquivos corrompidos ou ausentes
+
+## Mocking e Dependências Externas
+
+Os testes utilizam mocking extensivo para:
+- **keyring**: Evita dependências do sistema operacional
+- **arquivos de configuração**: Usa diretórios temporários
+- **datetime**: Para testes de expiração consistentes
+- **uuid**: Para IDs previsíveis em testes
+
+Isso garante que os testes sejam:
+- Independentes do ambiente
+- Rápidos de executar
+- Reproduzíveis
+- Isolados entre si
