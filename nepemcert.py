@@ -11,11 +11,151 @@ import click
 import pandas as pd
 from rich.console import Console
 
-# Importar o módulo CLI melhorado
-from cli import main as cli_main
+# Importar a nova interface CLI
+from ui import CLIInterface
+from app.certificate_service import CertificateService
+from app.template_manager import TemplateManager
+from app.parameter_manager import ParameterManager
+from app.theme_manager import ThemeManager
+from app.connectivity_manager import ConnectivityManager
+from app.cert_auth_manager import CertAuthenticationManager
+from app.zip_exporter import ZipExporter
 
 # Console Rich para saída formatada
 console = Console()
+
+
+def initialize_app_services():
+    """Inicializa todos os serviços da aplicação."""
+    services = {}
+    
+    # Serviços principais
+    services["parameter_manager"] = ParameterManager()
+    services["template_manager"] = TemplateManager()
+    services["theme_manager"] = ThemeManager()
+    services["connectivity_manager"] = ConnectivityManager()
+    services["auth_manager"] = CertAuthenticationManager()
+    services["zip_exporter"] = ZipExporter()
+    services["certificate_service"] = CertificateService()
+    
+    return services
+
+
+def interactive_mode():
+    """Executa o modo interativo usando a nova UI."""
+    # Inicializar serviços
+    app_services = initialize_app_services()
+    
+    # Criar interface CLI
+    cli_interface = CLIInterface(app_services)
+    
+    # Loop principal da aplicação
+    while True:
+        try:
+            # Exibir menu principal
+            choice = cli_interface.show_main_menu()
+            
+            if not choice:
+                break
+            
+            # Processar escolha
+            if choice == "🚪 Sair":
+                if cli_interface.show_exit_confirmation():
+                    break
+                continue
+            
+            elif choice == "🔖 Gerar Certificados":
+                cli_interface.handle_generator_action(choice)
+            
+            elif choice == "🎨 Gerenciar Templates":
+                template_choice = cli_interface.show_templates_menu()
+                if template_choice and template_choice != "↩️ Voltar ao menu principal":
+                    cli_interface.handle_template_action(template_choice)
+            
+            elif choice == "⚙️ Configurações":
+                settings_choice = cli_interface.show_settings_menu()
+                if settings_choice and settings_choice != "↩️ Voltar ao menu principal":
+                    handle_settings_action(app_services, settings_choice)
+            
+            elif choice == "🔄 Sincronização e Conectividade":
+                connectivity_choice = cli_interface.show_connectivity_menu()
+                if connectivity_choice and connectivity_choice != "↩️ Voltar ao menu principal":
+                    handle_connectivity_action(app_services, connectivity_choice)
+            
+            elif choice == "❓ Ajuda":
+                cli_interface.show_help()
+            
+            # Comandos de debug
+            elif choice.startswith("🐛 DEBUG:"):
+                handle_debug_action(app_services, choice)
+        
+        except KeyboardInterrupt:
+            console.print("\n[yellow]Operação cancelada pelo usuário.[/yellow]")
+            if cli_interface.show_exit_confirmation():
+                break
+        except Exception as e:
+            console.print(f"[bold red]Erro inesperado: {str(e)}[/bold red]")
+            console.print("[yellow]Retornando ao menu principal...[/yellow]")
+
+
+def handle_settings_action(app_services, action):
+    """Processa ações de configurações."""
+    # Implementação simplificada para as configurações
+    console.print(f"[yellow]Ação de configuração '{action}' em desenvolvimento.[/yellow]")
+    console.print("[cyan]Use o modo interativo completo para acessar todas as configurações.[/cyan]")
+    
+    from ui.ui_utils import UIUtils
+    ui_utils = UIUtils()
+    ui_utils.wait_for_enter()
+
+
+def handle_connectivity_action(app_services, action):
+    """Processa ações de conectividade."""
+    conn_manager = app_services["connectivity_manager"]
+    
+    if action == "🔄 Verificar conexão":
+        console.print("[bold blue]Verificando conexão com o servidor...[/bold blue]")
+        result = conn_manager.check_connection()
+        
+        status_color = {
+            "Conectado": "green",
+            "Desconectado": "red"
+        }.get(result["status"], "yellow")
+        
+        console.print(f"Status: [{status_color}]{result['status']}[/{status_color}]")
+        console.print(f"Mensagem: {result['message']}")
+        console.print(f"Horário: {result['timestamp']}")
+    
+    else:
+        console.print(f"[yellow]Ação de conectividade '{action}' em desenvolvimento.[/yellow]")
+    
+    from ui.ui_utils import UIUtils
+    ui_utils = UIUtils()
+    ui_utils.wait_for_enter()
+
+
+def handle_debug_action(app_services, action):
+    """Processa ações de debug."""
+    if "Comparar temas" in action:
+        console.print("[bold blue]🐛 DEBUG: Comparação de temas[/bold blue]")
+        
+        theme_manager = app_services["theme_manager"]
+        themes = theme_manager.list_themes()
+        
+        console.print(f"Temas disponíveis: {len(themes)}")
+        for theme in themes:
+            console.print(f"  • {theme}")
+    
+    elif "Verificar sistema" in action:
+        console.print("[bold blue]🐛 DEBUG: Verificação do sistema[/bold blue]")
+        
+        # Verificar serviços
+        for service_name, service in app_services.items():
+            console.print(f"✓ {service_name}: {type(service).__name__}")
+    
+    from ui.ui_utils import UIUtils
+    ui_utils = UIUtils()
+    ui_utils.wait_for_enter()
 
 
 @click.group(invoke_without_command=True)
@@ -25,13 +165,13 @@ def cli(ctx):
     """NEPEM Certificados - Gerador de certificados em lote via linha de comando."""
     # Se nenhum comando foi especificado, executa o modo interativo
     if ctx.invoked_subcommand is None:
-        cli_main()
+        interactive_mode()
 
 
 @cli.command()
 def interactive():
     """Inicia a interface interativa do gerador de certificados."""
-    cli_main()
+    interactive_mode()
 
 
 @cli.command()
@@ -47,12 +187,6 @@ def generate(csv_file, template, output, zip, zip_name):
     CSV_FILE: Caminho para o arquivo CSV com os dados dos participantes.
     TEMPLATE: Caminho para o arquivo de template HTML.
     """
-    # Importações necessárias
-    import pandas as pd
-    from app.certificate_service import CertificateService # Import CertificateService
-    from app.zip_exporter import ZipExporter
-    from app.template_manager import TemplateManager as GlobalTemplateManager # Alias for local instance
-    
     console.print(f"[bold blue]Gerando certificados...[/bold blue]")
     console.print(f"- Arquivo CSV: [cyan]{csv_file}[/cyan]")
     console.print(f"- Template: [cyan]{template}[/cyan]")
@@ -62,82 +196,71 @@ def generate(csv_file, template, output, zip, zip_name):
         # Criar diretório de saída se não existir
         os.makedirs(output, exist_ok=True)
         
-        # Instantiate CertificateService
+        # Inicializar serviços necessários
         certificate_service = CertificateService(output_dir=output)
-        # ZipExporter is still needed for zipping after generation
         zip_exporter = ZipExporter()
-        # TemplateManager instance for temporary template handling by this command
-        cli_template_manager = GlobalTemplateManager()
+        template_manager = TemplateManager()
 
-        # Prepare template for the service:
-        # The service expects template_name to be a file in its managed templates_dir.
-        # So, we read the template provided by path, save it to the managed dir,
-        # then pass its basename to the service.
+        # Preparar template para o serviço
         template_file_name = os.path.basename(template)
         original_template_in_managed_dir = False
-        managed_template_path = os.path.join(cli_template_manager.templates_dir, template_file_name)
+        managed_template_path = os.path.join(template_manager.templates_dir, template_file_name)
 
         try:
-            # Check if the source template is already in the managed directory
+            # Verificar se o template já está no diretório gerenciado
             if os.path.abspath(template) == os.path.abspath(managed_template_path):
                 original_template_in_managed_dir = True
                 console.print(f"[dim]Template '{template_file_name}' já está no diretório gerenciado.[/dim]")
             else:
                 with open(template, 'r', encoding='utf-8') as f:
                     original_template_content = f.read()
-                # Save it to the managed directory so the service can find it by name
-                cli_template_manager.save_template(template_file_name, original_template_content)
-                console.print(f"[green]✓[/green] Template '{template_file_name}' preparado para o serviço (copiado para {cli_template_manager.templates_dir}).")
+                template_manager.save_template(template_file_name, original_template_content)
+                console.print(f"[green]✓[/green] Template '{template_file_name}' preparado para o serviço.")
         except Exception as e:
             console.print(f"[bold red]Erro ao preparar template '{template}': [/bold red]{str(e)}")
             sys.exit(1)
 
-        # Carregar dados do CSV (for count display, actual processing by service)
+        # Carregar dados do CSV
         try:
-            df = pd.read_csv(csv_file) # Still load for count, service handles actual data loading
-            console.print(f"[green]✓[/green] Arquivo CSV '{csv_file}' carregado: {len(df)} registros indicados para processamento.")
+            df = pd.read_csv(csv_file)
+            console.print(f"[green]✓[/green] Arquivo CSV '{csv_file}' carregado: {len(df)} registros.")
         except Exception as e:
             console.print(f"[bold red]Erro ao carregar CSV '{csv_file}': [/bold red]{str(e)}")
-            # Attempt to remove temporary template before exiting if it was copied
+            # Limpar template temporário
             if not original_template_in_managed_dir and os.path.exists(managed_template_path):
                 try:
                     os.remove(managed_template_path)
-                    console.print(f"[dim]Template temporário '{template_file_name}' limpo após erro.[/dim]")
-                except Exception as e_clean:
-                    console.print(f"[yellow]Aviso: Não foi possível limpar o template temporário '{template_file_name}' ao sair: {str(e_clean)}[/yellow]")
+                except:
+                    pass
             sys.exit(1)
 
-        # Parameters for the service call
-        event_data = {} # Event details are not directly prompted in this CLI mode; service relies on CSV/parameters.json
-        theme_name = None # Themes are not supported in this CLI mode currently
-        has_header = True # Default assumption for this CLI mode; CSVs for batch usually have headers.
+        # Parâmetros para geração
+        event_data = {}
+        theme_name = None
+        has_header = True
 
         console.print(f"Chamando CertificateService para geração em lote...")
-        # Call the service to generate certificates
+        
+        # Gerar certificados
         generation_result = certificate_service.generate_certificates_batch(
             csv_file_path=csv_file,
             event_details=event_data,
-            template_name=template_file_name, # Basename of the template path
+            template_name=template_file_name,
             theme_name=theme_name,
             has_header=has_header
         )
 
-        # Cleanup temporary template if it was copied
+        # Limpar template temporário
         if not original_template_in_managed_dir and os.path.exists(managed_template_path):
             try:
                 os.remove(managed_template_path)
                 console.print(f"[dim]Template temporário '{template_file_name}' limpo.[/dim]")
-            except FileNotFoundError: # Should not happen if os.path.exists was true, but good practice
-                console.print(f"[dim]Template temporário '{template_file_name}' já havia sido removido ou não existia.[/dim]")
             except Exception as e:
-                console.print(f"[yellow]Aviso: Não foi possível limpar o template temporário '{template_file_name}': {str(e)}[/yellow]")
+                console.print(f"[yellow]Aviso: Não foi possível limpar o template temporário: {str(e)}[/yellow]")
 
-        # Handle Results from CertificateService
+        # Exibir resultados
         if generation_result["success_count"] > 0:
             console.print(f"[bold green]✓ {generation_result['success_count']} certificados gerados com sucesso![/bold green]")
-            # Optional: list all generated files
-            # for file_path in generation_result["generated_files"]:
-            #     console.print(f"  [green]•[/green] {file_path}")
 
         if generation_result["failed_count"] > 0:
             console.print(f"[bold red]✗ {generation_result['failed_count']} certificados falharam ao gerar.[/bold red]")
@@ -147,12 +270,10 @@ def generate(csv_file, template, output, zip, zip_name):
             for error_msg in generation_result["errors"]:
                 console.print(f"  [yellow]•[/yellow] {error_msg}")
         
-        # Criar arquivo ZIP se solicitado and if files were generated
+        # Criar arquivo ZIP se solicitado
         if zip and generation_result["generated_files"]:
             if not zip_name:
                 from datetime import datetime
-                # A more descriptive default name could use event name if available from parameters
-                # For now, using a timestamped generic name.
                 zip_name_default = f"certificados_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip"
                 zip_name = zip_name_default 
             
@@ -188,9 +309,6 @@ def config():
 @click.option("--url", help="Configurar URL do servidor remoto")
 def server(status, url):
     """Gerencia a conectividade com o servidor remoto."""
-    from app.connectivity_manager import ConnectivityManager
-    
-    # Inicializar gerenciador de conectividade
     conn_manager = ConnectivityManager()
     
     if status:
@@ -237,7 +355,7 @@ def debug_themes(template, output, zip):
     from app.parameter_manager import ParameterManager
     from app.template_manager import TemplateManager
     from app.theme_manager import ThemeManager
-    from app.cert_auth_manager import AuthenticationManager
+    from app.cert_auth_manager import CertAuthenticationManager
     
     console.print(f"[bold blue]🐛 DEBUG: Gerando certificados com todos os temas...[/bold blue]")
     console.print(f"- Template: [cyan]{template}[/cyan]")
@@ -261,7 +379,7 @@ def debug_themes(template, output, zip):
         parameter_manager = ParameterManager()
         template_manager_obj = TemplateManager()
         theme_manager = ThemeManager()
-        auth_manager = AuthenticationManager()
+        auth_manager = CertAuthenticationManager()
         
         # Dados para geração de código de autenticação
         nome_exemplo = "Maria Clara Desenvolvimento"
@@ -384,16 +502,13 @@ if __name__ == "__main__":
     # Verificar se o usuário quer ajuda específica
     help_args = ["--help", "-h", "h", "help"]
     if len(sys.argv) > 1 and any(arg in sys.argv for arg in help_args):
-        # Exibir ajuda normal do Click
         cli(["--help"])
     else:
-        # Tenta exibir a tela de carregamento dummy antes de iniciar
+        # Tenta exibir a tela de carregamento
         try:
             from app.loading_screen import loading_dummy
-            loading_dummy(4.0)  # Exibe por 4 segundos (só será exibido uma vez)
+            loading_dummy(4.0)
         except ImportError:
-            # Se não conseguir importar, continua normalmente
             console.print("[yellow]Aviso: Módulo de carregamento não encontrado.[/yellow]")
         
-        # Se não for solicitação de ajuda, executar normalmente
         cli()

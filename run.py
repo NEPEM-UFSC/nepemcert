@@ -5,7 +5,6 @@ Este arquivo fornece uma interface simplificada para iniciar a aplicação.
 
 import os
 import sys
-from pathlib import Path
 
 def custom_style():
     """Aplica estilo personalizado ao terminal."""
@@ -24,11 +23,12 @@ def main():
     
     # Importar e executar o CLI principal
     try:
-        from nepemcert import main as nepemcert_main
-        nepemcert_main()
-    except ImportError:
+        from nepemcert import cli
+        cli()
+    except ImportError as e:
         print("❌ Erro: Não foi possível importar o módulo principal.")
-        print("Verifique se o arquivo 'nepemcert.py' existe.")
+        print(f"Detalhes: {e}")
+        print("Verifique se o arquivo 'nepemcert.py' existe e suas dependências estão instaladas.")
         sys.exit(1)
 
 if __name__ == "__main__":
