@@ -13,7 +13,7 @@ from pathlib import Path
 # Adicionar o diretório raiz do projeto ao sys.path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
-from app.cert_auth_manager import AuthenticationManager
+from app.cert_auth_manager import CertAuthenticationManager
 
 class TestAuthenticationManager(unittest.TestCase):
 
@@ -37,8 +37,8 @@ class TestAuthenticationManager(unittest.TestCase):
         self.memory_conn.row_factory = sqlite3.Row # Definir row_factory aqui também
         self.mock_connect.return_value = self.memory_conn
         
-        self.auth_manager = AuthenticationManager(salt="test_salt")
-        # O _create_table já deve ter sido chamado no __init__ do AuthenticationManager
+        self.auth_manager = CertAuthenticationManager(salt="test_salt")
+        # O _create_table já deve ter sido chamado no __init__ do CertAuthenticationManager
 
     def tearDown(self):
         """Fecha a conexão e para o patcher após cada teste."""

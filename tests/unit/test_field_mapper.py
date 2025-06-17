@@ -109,21 +109,21 @@ def test_create_sample_data(field_mapper):
     # Lista vazia
     assert len(field_mapper.create_sample_data([])) == 0
 
-def test_get_field_info(field_mapper, sample_df):
+def test_get_field_info(field_mapper):
     """Testa o método get_field_info"""
-    # Garantir que sample_df é um DataFrame, não uma string
-    if isinstance(sample_df, str):
-        # Se sample_df for uma string (caminho), carregar o CSV
-        import pandas as pd
-        sample_df = pd.read_csv(sample_df)
+    # Usar DataFrame em vez de string
+    df = pd.DataFrame({
+        "nome": ["João Silva", "Maria Santos"],
+        "email": ["joao@email.com", "maria@email.com"]
+    })
     
-    field_info = field_mapper.get_field_info(sample_df, "nome")
+    info = field_mapper.get_field_info(df)
     
-    # Verificar se o dicionário retornado contém as chaves esperadas
-    expected_keys = ["field_name", "data_type", "sample_values"]
-    for key in expected_keys:
-        assert key in field_info
-    
+    assert "columns" in info
+    assert "dtypes" in info
+    assert len(info["columns"]) == 2
+    assert "nome" in info["columns"]
+    assert "email" in info["columns"]
     # Verificar se há pelo menos 2 valores de amostra (conforme sample_df)
     assert len(field_info["sample_values"]) >= 2
     

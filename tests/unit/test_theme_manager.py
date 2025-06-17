@@ -89,23 +89,27 @@ def test_load_all_themes(theme_manager, temp_themes_dir, sample_theme_settings):
 def test_save_and_load_theme(theme_manager, temp_themes_dir, sample_theme_settings):
     """Testa salvar e carregar um tema."""
     theme_name = "Teste Salvar"
-    theme_manager.save_theme(theme_name, sample_theme_settings)
+    from app.theme_manager import ThemeManager as theme_manager_module
+    manager = theme_manager_module(themes_dir=temp_themes_dir)
+    manager.save_theme(theme_name, sample_theme_settings)
     
-    loaded_settings = theme_manager.load_theme(theme_name)
+    loaded_settings = manager.load_theme(theme_name)
     assert loaded_settings == sample_theme_settings
     
     # Testar carregamento de tema pré-definido (mockado)
-    assert theme_manager.load_theme("Acadêmico Clássico") == {"font_family": "Times"}
-    assert theme_manager.load_theme("Tema Inexistente") is None
+    assert manager.load_theme("Acadêmico Clássico") == {"font_family": "Times"}
+    assert manager.load_theme("Tema Inexistente") is None
 
 def test_list_themes(theme_manager, temp_themes_dir, sample_theme_settings):
     """Testa a listagem de temas."""
     # Primeiro, salvar alguns temas personalizados
-    theme_manager.save_theme("Tema A", sample_theme_settings)
-    theme_manager.save_theme("Tema B", sample_theme_settings)
+    from app.theme_manager import ThemeManager as theme_manager_module
+    manager = theme_manager_module(themes_dir=temp_themes_dir)
+    manager.save_theme("Tema A", sample_theme_settings)
+    manager.save_theme("Tema B", sample_theme_settings)
     
     # Obter a lista de temas
-    themes = theme_manager.list_themes()
+    themes = manager.list_themes()
     
     # Verificar se os temas salvos estão na lista
     assert "Tema A" in themes, f"'Tema A' não encontrado em: {themes}"

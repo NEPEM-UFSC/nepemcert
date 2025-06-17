@@ -276,7 +276,7 @@ def test_complete_certificate_generation_flow(temp_workspace):
     from app.template_manager import TemplateManager
     from app.pdf_generator import PDFGenerator
     from app.parameter_manager import ParameterManager
-    from app.cert_auth_manager import AuthenticationManager
+    from app.cert_auth_manager import CertAuthenticationManager
     from app.field_mapper import FieldMapper
     from app.zip_exporter import ZipExporter
     
@@ -291,7 +291,7 @@ def test_complete_certificate_generation_flow(temp_workspace):
     template_manager = TemplateManager(templates_dir=template_dir)
     pdf_generator = PDFGenerator(output_dir=output_dir)
     param_manager = ParameterManager(config_file=os.path.join(config_dir, "parameters.json"))
-    auth_manager = AuthenticationManager()
+    auth_manager = CertAuthenticationManager()
     field_mapper = FieldMapper()
     zip_exporter = ZipExporter()
     

@@ -444,7 +444,7 @@ def test_certificate_service_authentication_codes(certificate_workspace):
     assert results["success_count"] == 4
     
     # Verificar se os códigos de autenticação foram salvos
-    codigos_dir = os.path.join(workspace, "..", "codigos")  # AuthenticationManager salva em codigos/
+    codigos_dir = os.path.join(workspace, "..", "codigos")  # CertAuthenticationManager salva em codigos/
     
     # Como os códigos são salvos em um diretório diferente, vamos verificar se o método foi chamado
     # Testamos isso indiretamente verificando se não houve erros relacionados à autenticação

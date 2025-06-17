@@ -138,7 +138,7 @@ def managers(tmp_path):
     from app.zip_exporter import ZipExporter
     from app.parameter_manager import ParameterManager
     from app.theme_manager import ThemeManager
-    from app.cert_auth_manager import AuthenticationManager
+    from app.cert_auth_manager import CertAuthenticationManager
     from app.field_mapper import FieldMapper
 
     # Criar diretórios temporários para cada gerenciador
@@ -161,7 +161,7 @@ def managers(tmp_path):
         "zip": ZipExporter(),
         "parameter": ParameterManager(config_file=str(temp_config_dir / "parameters.json")),
         "theme": ThemeManager(themes_dir=str(temp_themes_dir)),
-        "auth": AuthenticationManager(),
+        "auth":CertAuthenticationManager(),
         "mapper": FieldMapper(),
         "dirs": {
             "uploads": temp_uploads_dir,
@@ -251,7 +251,7 @@ def test_theme_template_integration(managers):
     assert "Mensagem Teste" in rendered_html
 
 def test_auth_qr_code_in_html_integration(managers):
-    """Testa a integração do AuthenticationManager com TemplateManager para QR codes."""
+    """Testa a integração doCertAuthenticationManager com TemplateManager para QR codes."""
     auth_manager = managers["auth"]
     template_manager = managers["template"]
 
@@ -270,7 +270,7 @@ def test_auth_qr_code_in_html_integration(managers):
     template_name = "qr_test.html"
     template_manager.save_template(template_name, template_content)
 
-    # Usar o método correto do AuthenticationManager
+    # Usar o método correto doCertAuthenticationManager
     qrcode_base64 = auth_manager.gerar_qrcode_base64(auth_code)
 
     render_data = {
