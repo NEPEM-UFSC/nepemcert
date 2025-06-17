@@ -27,6 +27,7 @@ class CertAuthenticationManager:
     - Gerar códigos de autenticação únicos para certificados
     - Armazenar e recuperar códigos de autenticação
     - Validar códigos de autenticação
+    - Integrar com sync_manager para sincronização
     """
     
     # Salt padrão para aumentar a segurança
@@ -42,41 +43,41 @@ class CertAuthenticationManager:
         """
         self.salt = salt or self.DEFAULT_SALT
         
-        # Determine the base directory of the project (nepem-sice)
-        # __file__ is app/authentication_manager.py
-        # os.path.dirname(__file__) is app/
-        # os.path.dirname(os.path.dirname(__file__)) is the project root
+        # Usar certs.db como banco principal
         project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        self.db_path = os.path.join(project_root, 'codigos', 'auth_codes.db')
-        
-        # Ensure 'codigos' directory exists
-        os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
+        data_dir = os.path.join(project_root, 'data')
+        os.makedirs(data_dir, exist_ok=True)
+        self.db_path = os.path.join(data_dir, 'certs.db')
         
         self.conn = sqlite3.connect(self.db_path)
-        self.conn.row_factory = sqlite3.Row # Access columns by name
+        self.conn.row_factory = sqlite3.Row
         self._create_table()
 
     def _create_table(self):
-        """Cria a tabela auth_codes se ela não existir."""
+        """Cria a tabela certificates se ela não existir."""
         try:
             cursor = self.conn.cursor()
             cursor.execute('''
-                CREATE TABLE IF NOT EXISTS auth_codes (
-                    codigo_autenticacao TEXT PRIMARY KEY,
-                    nome_participante TEXT,
-                    evento TEXT,
-                    data_evento TEXT,
-                    local_evento TEXT,
-                    carga_horaria TEXT,
-                    data_geracao TEXT,
+                CREATE TABLE IF NOT EXISTS certificates (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    codigo_autenticacao TEXT UNIQUE NOT NULL,
+                    nome_participante TEXT NOT NULL,
+                    evento TEXT NOT NULL,
+                    data_evento TEXT NOT NULL,
+                    local_evento TEXT NOT NULL,
+                    carga_horaria TEXT NOT NULL,
+                    data_geracao TEXT NOT NULL,
                     url_verificacao TEXT,
-                    qrcode_base64 TEXT
+                    qrcode_base64 TEXT,
+                    sincronizado BOOLEAN DEFAULT 0,
+                    tentativas_sync INTEGER DEFAULT 0,
+                    ultimo_erro_sync TEXT,
+                    data_sincronizacao TEXT
                 )
             ''')
             self.conn.commit()
         except sqlite3.Error as e:
             print(f"Erro ao criar tabela SQLite: {e}")
-            # Depending on the application, might want to raise this or handle more gracefully
 
     def close_connection(self):
         """Fecha a conexão com o banco de dados."""
@@ -229,20 +230,22 @@ class CertAuthenticationManager:
             "carga_horaria": carga_horaria,
             "data_geracao": datetime.now().isoformat(),
             "url_verificacao": self.gerar_qrcode_data(codigo_autenticacao),
-            "qrcode_base64": self.gerar_qrcode_base64(codigo_autenticacao) # Storing for consistency, though can be regenerated
+            "qrcode_base64": self.gerar_qrcode_base64(codigo_autenticacao),
+            "sincronizado": False  # Novo certificado não sincronizado
         }
         
         try:
             cursor = self.conn.cursor()
             cursor.execute('''
-                INSERT INTO auth_codes (
+                INSERT INTO certificates (
                     codigo_autenticacao, nome_participante, evento, data_evento, 
-                    local_evento, carga_horaria, data_geracao, url_verificacao, qrcode_base64
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    local_evento, carga_horaria, data_geracao, url_verificacao, 
+                    qrcode_base64, sincronizado
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 dados["codigo_autenticacao"], dados["nome_participante"], dados["evento"], dados["data_evento"],
                 dados["local_evento"], dados["carga_horaria"], dados["data_geracao"],
-                dados["url_verificacao"], dados["qrcode_base64"]
+                dados["url_verificacao"], dados["qrcode_base64"], dados["sincronizado"]
             ))
             self.conn.commit()
             return True
@@ -294,17 +297,80 @@ class CertAuthenticationManager:
         """
         try:
             cursor = self.conn.cursor()
-            cursor.execute("SELECT * FROM auth_codes WHERE codigo_autenticacao = ?", (codigo[:32],)) # Ensure we use the same length as before if it was truncated
+            cursor.execute("SELECT * FROM certificates WHERE codigo_autenticacao = ?", (codigo[:32],))
             row = cursor.fetchone()
             
             if row:
-                return dict(row) # Convert sqlite3.Row to dict
+                return dict(row)
             else:
                 return None
         except sqlite3.Error as e:
             print(f"Erro ao verificar código no SQLite: {e}")
             return None
+
+    def get_unsynchronized_certificates(self):
+        """
+        Obtém todos os certificados que ainda não foram sincronizados.
         
+        Returns:
+            List[Dict]: Lista de certificados não sincronizados
+        """
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute("SELECT * FROM certificates WHERE sincronizado = 0 ORDER BY data_geracao ASC")
+            rows = cursor.fetchall()
+            return [dict(row) for row in rows]
+        except sqlite3.Error as e:
+            print(f"Erro ao buscar certificados não sincronizados: {e}")
+            return []
+
+    def mark_as_synchronized(self, codigo_autenticacao):
+        """
+        Marca um certificado como sincronizado.
+        
+        Args:
+            codigo_autenticacao (str): Código do certificado
+            
+        Returns:
+            bool: True se marcado com sucesso, False caso contrário
+        """
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute('''
+                UPDATE certificates 
+                SET sincronizado = 1, data_sincronizacao = ?
+                WHERE codigo_autenticacao = ?
+            ''', (datetime.now().isoformat(), codigo_autenticacao))
+            self.conn.commit()
+            return cursor.rowcount > 0
+        except sqlite3.Error as e:
+            print(f"Erro ao marcar certificado como sincronizado: {e}")
+            return False
+
+    def update_sync_attempt(self, codigo_autenticacao, error_message=None):
+        """
+        Atualiza tentativa de sincronização de um certificado.
+        
+        Args:
+            codigo_autenticacao (str): Código do certificado
+            error_message (str): Mensagem de erro da tentativa
+            
+        Returns:
+            bool: True se atualizado com sucesso, False caso contrário
+        """
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute('''
+                UPDATE certificates 
+                SET tentativas_sync = tentativas_sync + 1, ultimo_erro_sync = ?
+                WHERE codigo_autenticacao = ?
+            ''', (error_message, codigo_autenticacao))
+            self.conn.commit()
+            return cursor.rowcount > 0
+        except sqlite3.Error as e:
+            print(f"Erro ao atualizar tentativa de sincronização: {e}")
+            return False
+
     def gerar_codigo_verificacao(self, codigo_autenticacao):
         """
         [DEPRECATED] Essa função está depreciada e será removida em versões futuras.
