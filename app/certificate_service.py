@@ -117,14 +117,15 @@ class CertificateService:
                     )
                     
                     participant_data["codigo_verificacao"] = auth_code
-                    participant_data["url_verificacao"] = "https://nepemufsc.com/verificar"
+                    participant_data["url_verificacao"] = "https://certificados.nepemufsc.com"
                     
                     # Mesclar com parâmetros do sistema
                     final_data = self.parameter_manager.merge_placeholders(participant_data, theme_name)
                     
                     # Renderizar template
+                    #todo Verificar e adaptar para esquema correto do template manager que usa carregamento "self" por método, adaptar para usar "render_template" ou outro.
                     html_content = self.template_manager.render_template_from_string(template_content, final_data)
-                    
+
                     # Gerar QR code e substituir placeholder - USAR MÉTODO CORRETO
                     qr_base64 = self.auth_manager.gerar_qrcode_base64(auth_code)
                     html_content = self.auth_manager.substituir_qr_placeholder(html_content, qr_base64)
@@ -172,3 +173,108 @@ class CertificateService:
         """
         # Replace or remove characters that are not allowed in filenames
         return "".join(c if c.isalnum() or c in (' ', '_') else "_" for c in name).strip("_")
+    
+    def has_header(self, csv_file_path):
+        """
+        Check if the CSV file has a header row.
+
+        Args:
+            csv_file_path (str): Path to the CSV file
+
+        Returns:
+            bool: True if the CSV has a header, False otherwise
+        """
+        try:
+            df = pd.read_csv(csv_file_path, nrows=1)
+            return not df.empty and df.columns[0].lower() in ['nome', 'name', 'participante']
+        except Exception as e:
+            print(f"Error checking header: {str(e)}")
+            return False
+    
+    def generate_single_certificate(self, participant_data, template_name, theme_name=None, filename=None):
+        """
+        Gera um certificado individual.
+        
+        Args:
+            participant_data (dict): Dados do participante
+            template_name (str): Nome do template
+            theme_name (str, optional): Nome do tema
+            filename (str, optional): Nome do arquivo de saída
+        
+        Returns:
+            dict: Resultado da geração com sucesso/erro e caminho do arquivo
+        """
+        result = {
+            "success": False,
+            "file_path": None,
+            "error": None
+        }
+        
+        try:
+            # Carregar template
+            template_content = self.template_manager.load_template(template_name)
+            if not template_content:
+                result["error"] = f"Template '{template_name}' not found"
+                return result
+            
+            # Aplicar tema se especificado
+            if theme_name:
+                theme_settings = self.theme_manager.load_theme(theme_name)
+                if theme_settings:
+                    try:
+                        template_content = self.theme_manager.apply_theme_to_template(template_content, theme_settings)
+                    except Exception as e:
+                        result["error"] = f"Error applying theme '{theme_name}': {str(e)}"
+                        return result
+            
+            # Adicionar dados de emissão
+            participant_data["data_emissao"] = datetime.now().strftime("%d/%m/%Y")
+            participant_data["cidade"] = "Florianópolis"
+            
+            # Gerar código de autenticação
+            auth_code = self.auth_manager.gerar_codigo_autenticacao(
+                participant_data.get("nome", "Participante"), 
+                participant_data.get("evento", "Evento")
+            )
+            
+            participant_data["codigo_verificacao"] = auth_code
+            participant_data["url_verificacao"] = "https://nepemufsc.com/verificar"
+            
+            # Mesclar com parâmetros do sistema
+            final_data = self.parameter_manager.merge_placeholders(participant_data, theme_name)
+            
+            # Renderizar template
+            html_content = self.template_manager.render_template_from_string(template_content, final_data)
+            
+            # Gerar QR code e substituir placeholder
+            qr_base64 = self.auth_manager.gerar_qrcode_base64(auth_code)
+            html_content = self.auth_manager.substituir_qr_placeholder(html_content, qr_base64)
+            
+            # Definir nome do arquivo
+            if not filename:
+                safe_name = self._sanitize_filename(participant_data.get("nome", "participante"))
+                filename = f"certificado_{safe_name}.pdf"
+            
+            pdf_path = os.path.join(self.output_dir, filename)
+            
+            # Gerar PDF
+            if self.pdf_generator.generate_pdf(html_content, pdf_path, orientation="landscape"):
+                result["success"] = True
+                result["file_path"] = pdf_path
+                
+                # Salvar código de autenticação
+                self.auth_manager.salvar_codigo(
+                    auth_code,
+                    participant_data.get("nome", ""),
+                    participant_data.get("evento", ""),
+                    participant_data.get("data", ""),
+                    participant_data.get("local", ""),
+                    participant_data.get("carga_horaria", "")
+                )
+            else:
+                result["error"] = "Failed to generate PDF"
+                
+        except Exception as e:
+            result["error"] = str(e)
+        
+        return result
