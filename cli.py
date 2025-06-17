@@ -519,6 +519,15 @@ def generate_certificates_menu():
         "carga_horaria": carga_horaria,
     }
 
+    # Verificar conexão antes de iniciar a geração
+    connection_info = connectivity_manager.check_connection()
+    if connection_info["status"] == "Desconectado":
+        console.print(
+            "[bold yellow]AVISO:[/] Você está offline. Os certificados serão gerados localmente, "
+            "mas serão considerados inválidos até que sejam sincronizados com o servidor. "
+            "Por favor, conecte-se à internet e sincronize os certificados posteriormente."
+        )
+
     # Chamar o serviço de geração de certificados
     console.print("\n[bold]Iniciando geração de certificados com o serviço...[/bold]")
     with console.status("[bold green]Processando certificados..."):
@@ -1067,13 +1076,13 @@ def preview_template():
 
 def configure_directories():
     """Configura os diretórios de trabalho."""
-    console.print("[yellow]Função ainda não implementada.[/yellow]")
+    console.print("[yellow]Esta funcionalidade está planejada para uma futura atualização. Obrigado pela sua compreensão.[/yellow]")
     input("\nPressione Enter para voltar...")
 
 
 def configure_appearance():
     """Configura aparência e tema."""
-    console.print("[yellow]Função ainda não implementada.[/yellow]")
+    console.print("[yellow]Esta funcionalidade está planejada para uma futura atualização. Obrigado pela sua compreensão.[/yellow]")
     input("\nPressione Enter para voltar...")
 
 
@@ -1178,20 +1187,20 @@ def configure_institutional_placeholders():
 def configure_default_placeholders():
     """Configura valores padrão."""
     # Implementação básica
-    console.print("[yellow]Função ainda não implementada completamente.[/yellow]")
+    console.print("[yellow]Esta funcionalidade está planejada para uma futura atualização. Obrigado pela sua compreensão.[/yellow]")
     input("\nPressione Enter para voltar...")
 
 
 def configure_theme_placeholders():
     """Configura valores para temas."""
     # Implementação básica
-    console.print("[yellow]Função ainda não implementada completamente.[/yellow]")
+    console.print("[yellow]Esta funcionalidade está planejada para uma futura atualização. Obrigado pela sua compreensão.[/yellow]")
     input("\nPressione Enter para voltar...")
 
 
 def manage_presets():
     """Gerencia presets de configuração."""
-    console.print("[yellow]Função ainda não implementada.[/yellow]")
+    console.print("[yellow]Esta funcionalidade está planejada para uma futura atualização. Obrigado pela sua compreensão.[/yellow]")
     input("\nPressione Enter para voltar...")
 
 
@@ -2157,7 +2166,7 @@ def show_sync_history_stub():
     """Placeholder for showing synchronization history."""
     console.clear()
     console.print("[bold blue]== Histórico de Sincronização ==[/bold blue]\n")
-    console.print("[yellow]Esta função ainda não está implementada.[/yellow]")
+    console.print("[yellow]Esta funcionalidade está planejada para uma futura atualização. Obrigado pela sua compreensão.[/yellow]")
     console.print("\n[dim]Pressione Enter para voltar ao menu...[/dim]")
     input()
     connectivity_menu() # Return to connectivity menu
