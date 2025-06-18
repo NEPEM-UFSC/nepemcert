@@ -110,12 +110,11 @@ def quiet_path(message, **kwargs):
 from app.csv_manager import CSVManager
 from app.template_manager import TemplateManager
 from app.pdf_generator import PDFGenerator
-from app.field_mapper import FieldMapper
 from app.zip_exporter import ZipExporter
 from app.connectivity_manager import ConnectivityManager
 from app.parameter_manager import ParameterManager
 from app.theme_manager import ThemeManager
-from app.cert_auth_manager import AuthenticationManager
+from app.cert_auth_manager import CertAuthenticationManager
 from app.certificate_service import CertificateService # Added CertificateService import
 
 # Configuração do console Rich
@@ -128,12 +127,11 @@ APP_VERSION = "1.1.0"
 csv_manager = CSVManager()
 template_manager = TemplateManager()
 pdf_generator = PDFGenerator()
-field_mapper = FieldMapper()
 zip_exporter = ZipExporter()
 connectivity_manager = ConnectivityManager()
 parameter_manager = ParameterManager()
 theme_manager = ThemeManager()
-auth_manager = AuthenticationManager()
+auth_manager = CertAuthenticationManager()
 certificate_service = CertificateService() # Instantiated CertificateService
 
 
@@ -2311,14 +2309,14 @@ def debug_generate_certificate_for_theme(tema_nome):
         from app.theme_manager import ThemeManager
         from app.pdf_generator import PDFGenerator
         from app.parameter_manager import ParameterManager
-        from app.cert_auth_manager import AuthenticationManager
+        from app.cert_auth_manager import CertAuthenticationManager
         
         # Inicializar gerenciadores
         template_manager = TemplateManager()
         theme_manager = ThemeManager()
         pdf_generator = PDFGenerator()
         param_manager = ParameterManager()
-        auth_manager = AuthenticationManager()
+        auth_manager = CertAuthenticationManager()
         
         # Carregar template padrão
         template_name = "certificado_v1_basico.html"

@@ -218,6 +218,304 @@ def server(status, url):
 
 
 @cli.command()
+@click.option("--stats", is_flag=True, help="Mostrar estatísticas de sincronização")
+@click.option("--package", is_flag=True, help="Criar pacote de sincronização")
+@click.option("--pending", is_flag=True, help="Listar certificados pendentes")
+@click.option("--cleanup", type=int, metavar="DAYS", help="Limpar registros sincronizados com mais de N dias")
+@click.option("--backup", is_flag=True, help="Criar backup do banco de dados offline")
+def sync(stats, package, pending, cleanup, backup):
+    """Gerencia a sincronização offline de códigos de autenticação."""
+    from app.offline_sync_manager import OfflineSyncManager
+    from rich.table import Table
+    from rich import box
+    
+    # Inicializar gerenciador de sincronização offline
+    sync_manager = OfflineSyncManager()
+    
+    try:
+        if stats:
+            console.print("[bold blue]📊 Estatísticas de Sincronização Offline[/bold blue]\n")
+            
+            statistics = sync_manager.get_sync_statistics()
+            
+            if not statistics:
+                console.print("[red]❌ Erro ao obter estatísticas[/red]")
+                return
+            
+            # Tabela de status
+            status_table = Table(title="Status dos Certificados", box=box.ROUNDED)
+            status_table.add_column("Status", style="bold")
+            status_table.add_column("Quantidade", style="cyan", justify="right")
+            
+            status_counts = statistics.get('status_counts', {})
+            status_table.add_row("📋 Pendentes", str(status_counts.get('pending', 0)))
+            status_table.add_row("✅ Sincronizados", str(status_counts.get('synced', 0)))
+            status_table.add_row("❌ Falharam", str(status_counts.get('failed', 0)))
+            status_table.add_row("🔄 Aguardando retry", str(status_counts.get('retry', 0)))
+            status_table.add_row("📊 Total", str(statistics.get('total_records', 0)), style="bold green")
+            
+            console.print(status_table)
+            console.print()
+            
+            # Informações adicionais
+            console.print(f"📈 Últimas 24h: [cyan]{statistics.get('last_24h_count', 0)}[/cyan] novos certificados")
+            console.print(f"🔢 Média de tentativas: [yellow]{statistics.get('avg_sync_attempts', 0):.1f}[/yellow]")
+            console.print(f"🎯 Máx. tentativas: [red]{statistics.get('max_sync_attempts', 0)}[/red]")
+            console.print(f"💾 Banco de dados: [dim]{statistics.get('db_path', 'N/A')}[/dim]")
+            
+        elif package:
+            console.print("[bold blue]📦 Criando pacote de sincronização...[/bold blue]")
+            
+            with console.status("[bold green]Preparando pacote..."):
+                package_path = sync_manager.create_sync_package()
+            
+            if package_path:
+                console.print(f"[bold green]✅ Pacote criado com sucesso![/bold green]")
+                console.print(f"📁 Localização: [cyan]{package_path}[/cyan]")
+            else:
+                console.print("[yellow]⚠️ Nenhum certificado pendente para empacotamento[/yellow]")
+                
+        elif pending:
+            console.print("[bold blue]📋 Certificados Pendentes de Sincronização[/bold blue]\n")
+            
+            pending_certs = sync_manager.get_pending_certificates(limit=50)
+            
+            if not pending_certs:
+                console.print("[green]🎉 Todos os certificados estão sincronizados![/green]")
+                return
+            
+            # Tabela de certificados pendentes
+            pending_table = Table(title=f"Primeiros {len(pending_certs)} certificados pendentes", box=box.SIMPLE)
+            pending_table.add_column("Nome", style="bold")
+            pending_table.add_column("Evento", style="cyan")
+            pending_table.add_column("Status", style="yellow")
+            pending_table.add_column("Tentativas", justify="right")
+            pending_table.add_column("Criado em", style="dim")
+            
+            for cert in pending_certs:
+                status_emoji = {
+                    'pending': '⏳',
+                    'failed': '❌',
+                    'retry': '🔄'
+                }.get(cert.sync_status, '❓')
+                
+                pending_table.add_row(
+                    cert.nome_participante[:30] + "..." if len(cert.nome_participante) > 30 else cert.nome_participante,
+                    cert.evento[:40] + "..." if len(cert.evento) > 40 else cert.evento,
+                    f"{status_emoji} {cert.sync_status}",
+                    str(cert.sync_attempts),
+                    cert.created_at[:16] if cert.created_at else "N/A"
+                )
+            
+            console.print(pending_table)
+            
+            if len(pending_certs) == 50:
+                console.print("\n[dim]... mostrando apenas os primeiros 50 registros[/dim]")
+                
+        elif cleanup is not None:
+            console.print(f"[bold blue]🧹 Limpando registros sincronizados com mais de {cleanup} dias...[/bold blue]")
+            
+            with console.status("[bold yellow]Executando limpeza..."):
+                removed_count = sync_manager.cleanup_synced_records(days_old=cleanup)
+            
+            if removed_count > 0:
+                console.print(f"[bold green]✅ {removed_count} registros removidos com sucesso![/bold green]")
+            else:
+                console.print("[yellow]ℹ️ Nenhum registro foi removido[/yellow]")
+                
+        elif backup:
+            console.print("[bold blue]💾 Criando backup do banco de dados...[/bold blue]")
+            
+            with console.status("[bold green]Criando backup..."):
+                backup_path = sync_manager.backup_database()
+            
+            if backup_path:
+                console.print(f"[bold green]✅ Backup criado com sucesso![/bold green]")
+                console.print(f"📁 Localização: [cyan]{backup_path}[/cyan]")
+            else:
+                console.print("[red]❌ Erro ao criar backup[/red]")
+                
+        else:
+            console.print("[bold blue]🔄 Gerenciamento de Sincronização Offline[/bold blue]")            
+            console.print("\n[yellow]Escolha uma das opções disponíveis:[/yellow]")
+            console.print("  [cyan]--stats[/cyan]     Mostrar estatísticas detalhadas")
+            console.print("  [cyan]--package[/cyan]   Criar pacote de sincronização")
+            console.print("  [cyan]--pending[/cyan]   Listar certificados pendentes")
+            console.print("  [cyan]--cleanup N[/cyan] Limpar registros antigos (N dias)")
+            console.print("  [cyan]--backup[/cyan]    Criar backup do banco")
+            console.print("\n[dim]Exemplo: nepemcert sync --stats[/dim]")
+            
+    except Exception as e:
+        console.print(f"[bold red]❌ Erro ao executar operação de sincronização: {str(e)}[/bold red]")
+    finally:
+        sync_manager.close()
+
+
+@cli.command("auto-sync")
+@click.option("--start", is_flag=True, help="Iniciar serviço de sincronização automática")
+@click.option("--stop", is_flag=True, help="Parar serviço de sincronização automática")
+@click.option("--status", is_flag=True, help="Status do serviço de sincronização")
+@click.option("--force", is_flag=True, help="Forçar sincronização imediata")
+@click.option("--daemon", is_flag=True, help="Executar como daemon (background)")
+def auto_sync(start, stop, status, force, daemon):
+    """Gerencia o serviço de sincronização automática."""
+    from app.auto_sync_service import AutoSyncService
+    from rich.table import Table
+    from rich import box
+    import signal
+    import sys
+    
+    service = AutoSyncService()
+    
+    try:
+        if start:
+            console.print("[bold blue]🚀 Iniciando serviço de sincronização automática...[/bold blue]")
+            
+            # Callbacks para mostrar progresso
+            def on_sync_success(cert):
+                console.print(f"[green]✅ Sincronizado: {cert.nome_participante}[/green]")
+            
+            def on_sync_error(cert, error_msg):
+                console.print(f"[red]❌ Erro em {cert.nome_participante}: {error_msg}[/red]")
+            
+            def on_connectivity_change(old_status, new_status):
+                if new_status:
+                    console.print("[bold green]🌐 Conectividade restaurada - sincronização ativa[/bold green]")
+                else:
+                    console.print("[bold yellow]📡 Conectividade perdida - modo offline[/bold yellow]")
+            
+            # Registrar callbacks
+            service.add_callback('sync_success', on_sync_success)
+            service.add_callback('sync_error', on_sync_error)
+            service.add_callback('connectivity_change', on_connectivity_change)
+            
+            # Iniciar serviço
+            service.start()
+            
+            if daemon:
+                console.print("[bold green]✅ Serviço iniciado em modo daemon[/bold green]")
+                console.print("[dim]Pressione Ctrl+C para parar o serviço[/dim]")
+                
+                # Configurar handler para SIGINT (Ctrl+C)
+                def signal_handler(sig, frame):
+                    console.print("\n[yellow]🛑 Parando serviço...[/yellow]")
+                    service.stop()
+                    console.print("[green]✅ Serviço parado[/green]")
+                    sys.exit(0)
+                
+                signal.signal(signal.SIGINT, signal_handler)
+                
+                # Manter o programa rodando
+                try:
+                    while True:
+                        import time
+                        time.sleep(1)
+                except KeyboardInterrupt:
+                    pass
+            else:
+                console.print("[bold green]✅ Serviço iniciado[/bold green]")
+                console.print("[yellow]⚠️ O serviço rodará apenas durante esta sessão[/yellow]")
+                
+        elif stop:
+            console.print("[bold yellow]🛑 Parando serviço de sincronização...[/bold yellow]")
+            service.stop()
+            console.print("[green]✅ Serviço parado[/green]")
+            
+        elif status:
+            console.print("[bold blue]📊 Status do Serviço de Sincronização Automática[/bold blue]\n")
+            
+            service_status = service.get_service_status()
+            
+            # Tabela de status
+            status_table = Table(title="Status do Serviço", box=box.ROUNDED)
+            status_table.add_column("Propriedade", style="bold")
+            status_table.add_column("Valor", style="cyan")
+            
+            # Status principal
+            running_emoji = "🟢" if service_status['running'] else "🔴"
+            connected_emoji = "🌐" if service_status['connected'] else "📡"
+            
+            status_table.add_row("Status do Serviço", f"{running_emoji} {'Rodando' if service_status['running'] else 'Parado'}")
+            status_table.add_row("Conectividade", f"{connected_emoji} {'Conectado' if service_status['connected'] else 'Desconectado'}")
+            status_table.add_row("Certificados Pendentes", str(service_status['pending_certificates']))
+            status_table.add_row("URL do Servidor", service_status['server_url'])
+            
+            # Tempos
+            if service_status['last_sync_time']:
+                status_table.add_row("Última Sincronização", service_status['last_sync_time'][:19])
+            if service_status['uptime_seconds']:
+                uptime_str = f"{service_status['uptime_seconds']:.0f}s"
+                if service_status['uptime_seconds'] > 3600:
+                    hours = service_status['uptime_seconds'] // 3600
+                    minutes = (service_status['uptime_seconds'] % 3600) // 60
+                    uptime_str = f"{hours:.0f}h {minutes:.0f}m"
+                elif service_status['uptime_seconds'] > 60:
+                    minutes = service_status['uptime_seconds'] // 60
+                    seconds = service_status['uptime_seconds'] % 60
+                    uptime_str = f"{minutes:.0f}m {seconds:.0f}s"
+                status_table.add_row("Tempo de Execução", uptime_str)
+            
+            console.print(status_table)
+            
+            # Estatísticas
+            stats = service_status['stats']
+            if any(stats.values()):
+                console.print()
+                stats_table = Table(title="Estatísticas", box=box.SIMPLE)
+                stats_table.add_column("Métrica", style="bold")
+                stats_table.add_column("Valor", style="green", justify="right")
+                
+                stats_table.add_row("Total Sincronizado", str(stats['total_synced']))
+                stats_table.add_row("Total Falharam", str(stats['total_failed']))
+                stats_table.add_row("Verificações de Conectividade", str(stats['connectivity_checks']))
+                
+                console.print(stats_table)
+            
+            # Configurações
+            config = service_status['config']
+            console.print()
+            config_table = Table(title="Configurações", box=box.SIMPLE)
+            config_table.add_column("Parâmetro", style="bold")
+            config_table.add_column("Valor", style="cyan")
+            
+            config_table.add_row("Intervalo de Verificação", f"{config['check_interval']}s")
+            config_table.add_row("Tamanho do Lote", str(config['batch_size']))
+            config_table.add_row("Máx. Simultâneos", str(config['max_concurrent']))
+            config_table.add_row("Intervalo Mín. Sync", f"{config['min_sync_interval']}s")
+            
+            console.print(config_table)
+            
+        elif force:
+            console.print("[bold blue]⚡ Forçando sincronização imediata...[/bold blue]")
+            
+            with console.status("[bold green]Sincronizando..."):
+                result = service.force_sync()
+            
+            if 'error' in result:
+                console.print(f"[red]❌ Erro: {result['error']}[/red]")
+            else:
+                console.print(f"[bold green]✅ Sincronização concluída![/bold green]")
+                console.print(f"  📊 Sucessos: [green]{result['success']}[/green]")
+                console.print(f"  📊 Falhas: [red]{result['failed']}[/red]")
+                
+        else:
+            console.print("[bold blue]🔄 Serviço de Sincronização Automática[/bold blue]")
+            console.print("\n[yellow]Opções disponíveis:[/yellow]")
+            console.print("  [cyan]--start[/cyan]      Iniciar serviço")
+            console.print("  [cyan]--start --daemon[/cyan] Iniciar como daemon")
+            console.print("  [cyan]--stop[/cyan]       Parar serviço")
+            console.print("  [cyan]--status[/cyan]     Ver status detalhado")
+            console.print("  [cyan]--force[/cyan]      Forçar sincronização")
+            console.print("\n[dim]Exemplo: nepemcert auto-sync --start --daemon[/dim]")
+            
+    except Exception as e:
+        console.print(f"[bold red]❌ Erro no serviço de sincronização: {str(e)}[/bold red]")
+    finally:
+        if 'service' in locals():
+            service.stop()
+
+
+@cli.command()
 @click.argument("template", type=click.Path(exists=True))
 @click.option("--output", "-o", default=None, help="Diretório de saída para os certificados (padrão: output/debug_themes_TIMESTAMP)")
 @click.option("--zip", "-z", is_flag=True, help="Criar arquivo ZIP com todos os certificados")

@@ -10,6 +10,7 @@ from .pdf_generator import PDFGenerator
 from .cert_auth_manager import CertAuthenticationManager
 from .parameter_manager import ParameterManager
 from .theme_manager import ThemeManager
+from .offline_sync_manager import OfflineSyncManager
 
 
 class CertificateService:
@@ -20,6 +21,7 @@ class CertificateService:
         self.auth_manager =CertAuthenticationManager()
         self.parameter_manager = ParameterManager()
         self.theme_manager = ThemeManager()
+        self.offline_sync_manager = OfflineSyncManager()
         self.output_dir = output_dir
         os.makedirs(self.output_dir, exist_ok=True)
 
@@ -47,18 +49,16 @@ class CertificateService:
         
         try:
             # 1. Carregar dados do CSV
-            df = self.csv_manager.load_data(csv_file_path)
+            df = self.csv_manager.load_data(csv_file_path, has_header=has_header)
             
             if df.empty:
                 result["failed_count"] = -1
                 result["errors"].append("CSV file is empty or could not be loaded")
                 return result
-            
-            # 2. Processar cabeçalho se necessário
+              # 2. Processar cabeçalho se necessário
             if has_header and len(df) > 0:
-                # Se tem cabeçalho, verificar se a primeira linha parece ser um cabeçalho
-                if df.iloc[0, 0].lower() in ['nome', 'name', 'participante']:
-                    df = df.iloc[1:].reset_index(drop=True)
+                # Se tem cabeçalho, remover a primeira linha
+                df = df.iloc[1:].reset_index(drop=True)
             
             # 3. Validar se há dados após processamento do cabeçalho
             if df.empty:
@@ -94,8 +94,7 @@ class CertificateService:
                     
                     # Adicionar detalhes do evento
                     participant_data.update(event_details)
-                    
-                    # Adicionar dados de emissão
+                      # Adicionar dados de emissão
                     from datetime import datetime
                     participant_data["data_emissao"] = datetime.now().strftime("%d/%m/%Y")
                     participant_data["cidade"] = "Florianópolis"  # Pode ser configurável
@@ -106,7 +105,7 @@ class CertificateService:
                         event_details.get("evento", "Evento")
                     )
                     
-                    # Salvar código de autenticação
+                    # Salvar código de autenticação localmente (método original)
                     self.auth_manager.salvar_codigo(
                         auth_code,
                         participant_data["nome"],
@@ -119,8 +118,30 @@ class CertificateService:
                     participant_data["codigo_verificacao"] = auth_code
                     participant_data["url_verificacao"] = "https://nepemufsc.com/verificar"
                     
-                    # Mesclar com parâmetros do sistema
+                    # Mesclar com parâmetros do sistema ANTES de usar final_data
                     final_data = self.parameter_manager.merge_placeholders(participant_data, theme_name)
+                    
+                    # NOVO: Armazenar no sistema offline para sincronização posterior
+                    certificate_data_for_sync = {
+                        'codigo_autenticacao': auth_code,
+                        'nome_participante': participant_data["nome"],
+                        'evento': event_details.get("evento", "Evento"),
+                        'data_evento': event_details.get("data", ""),
+                        'local_evento': event_details.get("local", ""),
+                        'carga_horaria': event_details.get("carga_horaria", ""),
+                        'coordenador': final_data.get("coordenador", ""),
+                        'diretor': final_data.get("diretor", ""),
+                        'data_geracao': datetime.now().isoformat(),
+                        'url_verificacao': "https://nepemufsc.com/verificar-certificados",
+                        'qrcode_base64': self.auth_manager.gerar_qrcode_base64(auth_code),
+                        'template_usado': template_name,
+                        'tema_usado': theme_name or "default"
+                    }
+                    
+                    # Armazenar para sincronização offline
+                    sync_stored = self.offline_sync_manager.store_certificate(certificate_data_for_sync)
+                    if not sync_stored:
+                        result["errors"].append(f"Warning: Failed to store {participant_data['nome']} for offline sync")
                     
                     # Renderizar template
                     html_content = self.template_manager.render_template_from_string(template_content, final_data)
