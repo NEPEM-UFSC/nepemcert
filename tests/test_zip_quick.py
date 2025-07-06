@@ -1,4 +1,3 @@
-n#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
 Teste rápido do ZipExporter para verificar se o método create_zip funciona.
