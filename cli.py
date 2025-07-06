@@ -354,7 +354,7 @@ def generate_certificates_menu():
             for i, nome in enumerate(df["nome"].head(preview_limit)):
                 console.print(f"  {i+1}. {nome}")
 
-        except pd.errors.UnicodeDecodeError:
+        except UnicodeDecodeError:
             console.print("[bold red]Erro de codificação:[/bold red] O arquivo não está em formato UTF-8.")
             console.print("[dim]Dica: Salve seu arquivo CSV com codificação UTF-8.[/dim]")
             return
@@ -657,117 +657,68 @@ def test_certificate_generation():
         console.print("[yellow]Operação cancelada.[/yellow]")
         return
     
-    # Carregar template
-    template_content = template_manager.load_template(template_name)
-    if not template_content:
-        console.print(f"[bold red]Erro ao carregar template:[/bold red] Arquivo não encontrado.")
-        input("\nPressione Enter para voltar...")
-        return
+    # Solicitar informações do participante e evento
+    console.print("[bold]Informações do Participante e Evento:[/bold]\n")
     
-    # Identificar placeholders
-    placeholders = template_manager.extract_placeholders(template_content)
-    
-    if not placeholders:
-        console.print("[yellow]Aviso: Não foram encontrados placeholders no template.[/yellow]")
-        input("\nPressione Enter para voltar...")
-        return
-      # Solicitar valores para os placeholders
-    test_data = {}
-    console.print("[bold]Informe os valores para os campos:[/bold]\n")
-    
-    # Solicitar informações principais primeiro
     nome = quiet_text("Nome do participante:")
+    if not nome:
+        console.print("[yellow]Operação cancelada.[/yellow]")
+        return
+    
     evento = quiet_text("Nome do evento:")
     data = quiet_text("Data do evento (ex: 15/05/2025):", default=datetime.now().strftime("%d/%m/%Y"))
     local = quiet_text("Local do evento:")
     carga_horaria = quiet_text("Carga horária (horas):")
-      # Gerar código de autenticação para o teste
-    codigo_autenticacao = auth_manager.gerar_codigo_autenticacao(
-        nome_participante=nome,
-        evento=evento,
-        data_evento=data
-    )    # O código de verificação curto foi depreciado, usando o próprio código de autenticação completo
-    codigo_verificacao = codigo_autenticacao
     
-    url_base = "https://certificados.nepemufsc.com"
-    qrcode_url = auth_manager.gerar_qrcode_data(codigo_autenticacao)
-    
-    # Salvar informações do certificado de teste
-    auth_manager.salvar_codigo(
-        codigo_autenticacao=codigo_autenticacao,
-        nome_participante=nome,
-        evento=evento,
-        data_evento=data,
-        local_evento=local,
-        carga_horaria=carga_horaria
+    # Selecionar tema
+    themes = ["Nenhum"] + theme_manager.list_themes()
+    selected_theme = quiet_select(
+        "Selecione um tema para o certificado:",
+        choices=themes,
+        style=get_menu_style()
     )
     
-    # Adicionar valores principais e códigos ao dicionário de dados
-    test_data["nome"] = nome
-    test_data["evento"] = evento
-    test_data["data"] = data
-    test_data["local"] = local
-    test_data["carga_horaria"] = carga_horaria    
-    test_data["codigo_autenticacao"] = codigo_autenticacao
-    test_data["codigo_verificacao"] = codigo_verificacao
-    test_data["url_verificacao"] = url_base
-    test_data["url_qrcode"] = qrcode_url
-    test_data["data_emissao"] = datetime.now().strftime("%d/%m/%Y")
+    theme = None if selected_theme == "Nenhum" else selected_theme
     
-    # Solicitar valores para os demais placeholders que não foram preenchidos
-    outros_placeholders = [p for p in placeholders if p not in test_data]
-    for placeholder in outros_placeholders:
-        value = quiet_text(f"Valor para '{placeholder}':")
-        test_data[placeholder] = value
+    # Preparar dados do evento
+    event_data = {
+        "evento": evento,
+        "data": data,
+        "local": local,
+        "carga_horaria": carga_horaria
+    }
     
-    # Gerar PDF de teste
-    output_path = os.path.join(certificate_service.output_dir, "certificado_teste.pdf") # Use service's output_dir
-    
+    # Gerar certificado usando o serviço
     try:
         with console.status("[bold green]Gerando certificado de teste..."):
-            # Gerar HTML com os valores substituídos usando o template_manager
-            temp_name = f"temp_test_{random.randint(1000, 9999)}.html"
-            temp_path = os.path.join("templates", temp_name)
+            result = certificate_service.generate_single_certificate(
+                participant_name=nome,
+                event_details=event_data,
+                template_name=template_name,
+                theme_name=theme
+            )
+        
+        if result["success"]:
+            console.print(f"[bold green]✓ Certificado de teste gerado com sucesso![/bold green]")
+            console.print(f"[bold]Caminho:[/bold] {result['generated_file']}")
             
-            try:
-                # Salvar template temporário
-                with open(temp_path, "w", encoding="utf-8") as f:
-                    f.write(template_content)
-                  # Gerar QR code adaptado ao tamanho do placeholder no template
-                qr_info = auth_manager.gerar_qrcode_adaptado(codigo_autenticacao, template_content)
-                test_data["qrcode_base64"] = qr_info["qrcode_base64"]
-                
-                # Renderizar o template com os dados
-                html_content = template_manager.render_template(temp_name, test_data)
-                
-                # Substituir o placeholder do QR code pelo QR code real
-                html_content = auth_manager.substituir_qr_placeholder(html_content, qr_info["qrcode_base64"])
-                
-                # Gerar PDF
-                pdf_generator.generate_pdf(html_content, output_path, orientation='landscape')
-            finally:
-                # Limpar arquivo temporário
-                if os.path.exists(temp_path):
-                    os.remove(temp_path)
-        
-        console.print(f"[bold green]✓ Certificado de teste gerado com sucesso![/bold green]")
-        console.print(f"[bold]Caminho:[/bold] {output_path}")
-        
-        # Oferecer opção para abrir o PDF
-        open_option = quiet_confirm("Deseja abrir o certificado gerado?")
-        
-        if open_option:
-            import subprocess
-            try:
-                os.startfile(output_path)  # Windows
-            except AttributeError:
+            # Oferecer opção para abrir o PDF
+            open_option = quiet_confirm("Deseja abrir o certificado gerado?")
+            
+            if open_option:
+                import subprocess
                 try:
-                    subprocess.call(["open", output_path])  # macOS
-                except:
-                    subprocess.call(["xdg-open", output_path])  # Linux
+                    os.startfile(result['generated_file'])  # Windows
+                except AttributeError:
+                    try:
+                        subprocess.call(["open", result['generated_file']])  # macOS
+                    except:
+                        subprocess.call(["xdg-open", result['generated_file']])  # Linux
+        else:
+            console.print(f"[bold red]Erro ao gerar certificado:[/bold red] {result['error']}")
     
     except Exception as e:
-        console.print(f"[bold red]Erro ao gerar certificado de teste:[/bold red] {str(e)}")
+        console.print(f"[bold red]Erro inesperado:[/bold red] {str(e)}")
     
     console.print("\n[dim]Pressione Enter para voltar ao menu...[/dim]")
     input()
@@ -1720,8 +1671,11 @@ def debug_compare_themes():
                     qr_info = auth_manager.gerar_qrcode_adaptado(codigo_autenticacao_exemplo, template_content)
                     merged_data["qrcode_base64"] = qr_info["qrcode_base64"]
                     
+                    # Aplicar tema ao template antes de renderizar
+                    themed_template = theme_manager.apply_theme_to_template(template_content, theme_settings)
+                    
                     # Renderizar template
-                    html_content = template_manager.render_template(temp_template_name, merged_data)
+                    html_content = template_manager.render_template_from_string(themed_template, merged_data)
                     
                     # Substituir o placeholder do QR code pelo QR code real
                     html_content = auth_manager.substituir_qr_placeholder(html_content, qr_info["qrcode_base64"])
@@ -2244,6 +2198,55 @@ def connectivity_menu():
 
 
 def show_help():
+    """Exibe a ajuda do sistema."""
+    console.clear()
+    console.print("[bold blue]== Ajuda do NEPEM Cert ==[/bold blue]\n")
+    
+    help_content = """
+[bold]NEPEM Cert - Gerador de Certificados em Lote[/bold]
+
+[bold cyan]Funcionalidades Principais:[/bold cyan]
+• [green]Geração de Certificados:[/green] Crie certificados em lote a partir de templates HTML e dados CSV
+• [green]Gerenciamento de Templates:[/green] Importe, edite e gerencie templates de certificados
+• [green]Temas Personalizados:[/green] Aplique diferentes estilos visuais aos seus certificados
+• [green]Configurações Flexíveis:[/green] Configure valores padrão, institucionais e específicos por tema
+
+[bold cyan]Como Usar:[/bold cyan]
+1. [yellow]Prepare seu arquivo CSV[/yellow] com uma coluna contendo os nomes dos participantes
+2. [yellow]Importe um template HTML[/yellow] ou use um dos templates existentes
+3. [yellow]Configure os parâmetros[/yellow] institucionais e valores padrão
+4. [yellow]Gere os certificados[/yellow] informando os dados do evento
+
+[bold cyan]Formatos Suportados:[/bold cyan]
+• [green]Templates:[/green] Arquivos HTML com placeholders no formato {{ placeholder }}
+• [green]Dados:[/green] Arquivos CSV com encoding UTF-8
+• [green]Saída:[/green] Certificados em PDF e opcionalmente empacotados em ZIP
+
+[bold cyan]Placeholders Disponíveis:[/bold cyan]
+• {{ nome }} - Nome do participante
+• {{ evento }} - Nome do evento
+• {{ data }} - Data do evento
+• {{ local }} - Local do evento
+• {{ carga_horaria }} - Carga horária do evento
+• {{ codigo_autenticacao }} - Código único de autenticação
+• {{ codigo_verificacao }} - Código de verificação
+• {{ data_emissao }} - Data de emissão do certificado
+
+[bold cyan]Dicas Importantes:[/bold cyan]
+• Use encoding UTF-8 nos arquivos CSV para evitar problemas com acentos
+• Templates HTML devem ser compatíveis com a biblioteca de geração de PDF
+• Evite elementos CSS complexos como flexbox ou posicionamento absoluto
+• Configure valores institucionais para reutilizar informações comuns
+
+[bold [bold cyan]Suporte:[/bold cyan]
+• Versão atual: v1.1.0
+• Para problemas técnicos, ative o modo DEBUG nas configurações
+• Templates de exemplo estão disponíveis na pasta 'templates'
+"""
+    
+    console.print(help_content)
+    
+    input("\n[dim]Pressione Enter para voltar ao menu principal...[/dim]")
     """Exibe a ajuda do sistema."""
     console.clear()
     console.print("[bold blue]== Ajuda do NEPEM Cert ==[/bold blue]\n")

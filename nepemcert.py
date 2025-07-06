@@ -678,6 +678,97 @@ def debug_themes(template, output, zip):
         sys.exit(1)
 
 
+@cli.command()
+@click.argument("participant_name", type=str)
+@click.argument("template", type=click.Path(exists=True))
+@click.option("--evento", required=True, help="Nome do evento")
+@click.option("--data", help="Data do evento")
+@click.option("--local", help="Local do evento")
+@click.option("--carga-horaria", help="Carga horária do evento")
+@click.option("--theme", help="Nome do tema a ser aplicado")
+@click.option("--output", "-o", default="output", help="Diretório de saída para o certificado")
+def generate_single(participant_name, template, evento, data, local, carga_horaria, theme, output):
+    """
+    Gera um único certificado para um participante.
+    
+    PARTICIPANT_NAME: Nome do participante.
+    TEMPLATE: Caminho para o arquivo de template HTML.
+    """
+    from app.certificate_service import CertificateService
+    from app.template_manager import TemplateManager as GlobalTemplateManager
+    from datetime import datetime
+    
+    console.print(f"[bold blue]Gerando certificado único...[/bold blue]")
+    console.print(f"- Participante: [cyan]{participant_name}[/cyan]")
+    console.print(f"- Template: [cyan]{template}[/cyan]")
+    console.print(f"- Evento: [cyan]{evento}[/cyan]")
+    console.print(f"- Diretório de saída: [cyan]{output}[/cyan]")
+    
+    try:
+        # Criar diretório de saída se não existir
+        os.makedirs(output, exist_ok=True)
+        
+        # Instanciar serviço de certificados
+        certificate_service = CertificateService(output_dir=output)
+        cli_template_manager = GlobalTemplateManager()
+        
+        # Preparar template para o serviço
+        template_file_name = os.path.basename(template)
+        original_template_in_managed_dir = False
+        managed_template_path = os.path.join(cli_template_manager.templates_dir, template_file_name)
+        
+        try:
+            # Verificar se o template já está no diretório gerenciado
+            if os.path.abspath(template) == os.path.abspath(managed_template_path):
+                original_template_in_managed_dir = True
+                console.print(f"[dim]Template '{template_file_name}' já está no diretório gerenciado.[/dim]")
+            else:
+                with open(template, 'r', encoding='utf-8') as f:
+                    original_template_content = f.read()
+                # Salvar no diretório gerenciado
+                cli_template_manager.save_template(template_file_name, original_template_content)
+                console.print(f"[green]✓[/green] Template '{template_file_name}' preparado para o serviço.")
+        except Exception as e:
+            console.print(f"[bold red]Erro ao preparar template '{template}': [/bold red]{str(e)}")
+            sys.exit(1)
+        
+        # Preparar dados do evento
+        event_data = {
+            "evento": evento,
+            "data": data or datetime.now().strftime("%d/%m/%Y"),
+            "local": local or "",
+            "carga_horaria": carga_horaria or ""
+        }
+        
+        console.print(f"Chamando CertificateService para geração de certificado único...")
+        # Chamar o serviço para gerar certificado
+        generation_result = certificate_service.generate_single_certificate(
+            participant_name=participant_name,
+            event_details=event_data,
+            template_name=template_file_name,
+            theme_name=theme
+        )
+        
+        # Limpar template temporário se foi copiado
+        if not original_template_in_managed_dir and os.path.exists(managed_template_path):
+            try:
+                os.remove(managed_template_path)
+                console.print(f"[dim]Template temporário '{template_file_name}' limpo.[/dim]")
+            except Exception as e:
+                console.print(f"[yellow]Aviso: Não foi possível limpar o template temporário: {str(e)}[/yellow]")
+        
+        # Tratar resultado
+        if generation_result["success"]:
+            console.print(f"[bold green]✓ Certificado gerado com sucesso![/bold green]")
+            console.print(f"[green]Arquivo:[/green] {generation_result['generated_file']}")
+        else:
+            console.print(f"[bold red]✗ Erro ao gerar certificado:[/bold red] {generation_result['error']}")
+            sys.exit(1)
+    
+    except Exception as e:
+        console.print(f"[bold red]Erro ao gerar certificado: [/bold red]{str(e)}")
+        sys.exit(1)
+
 if __name__ == "__main__":
     # Verificar se o usuário quer ajuda específica
     help_args = ["--help", "-h", "h", "help"]

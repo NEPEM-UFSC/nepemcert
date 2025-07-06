@@ -193,3 +193,132 @@ class CertificateService:
         """
         # Replace or remove characters that are not allowed in filenames
         return "".join(c if c.isalnum() or c in (' ', '_') else "_" for c in name).strip("_")
+    
+    def generate_single_certificate(self, participant_name, event_details, template_name, theme_name=None):
+        """
+        Gera um único certificado para um participante.
+        
+        Args:
+            participant_name (str): Nome do participante
+            event_details (dict): Detalhes do evento (nome, data, local, carga_horaria)
+            template_name (str): Nome do template a ser usado
+            theme_name (str, optional): Nome do tema a ser aplicado
+        
+        Returns:
+            dict: Resultado da geração com status e caminho do arquivo ou erro
+        """
+        result = {
+            "success": False,
+            "generated_file": None,
+            "error": None
+        }
+        
+        try:
+            # 1. Validar entrada
+            if not participant_name or not participant_name.strip():
+                result["error"] = "Nome do participante não pode estar vazio"
+                return result
+            
+            participant_name = participant_name.strip()
+            
+            # 2. Carregar template
+            template_content = self.template_manager.load_template(template_name)
+            if not template_content:
+                result["error"] = f"Template '{template_name}' não encontrado"
+                return result
+            
+            # 3. Aplicar tema se especificado
+            if theme_name:
+                theme_settings = self.theme_manager.load_theme(theme_name)
+                if theme_settings:
+                    try:
+                        template_content = self.theme_manager.apply_theme_to_template(template_content, theme_settings)
+                    except Exception as e:
+                        result["error"] = f"Erro ao aplicar tema '{theme_name}': {str(e)}"
+                        return result
+            
+            # 4. Preparar dados do participante
+            participant_data = {"nome": participant_name}
+            
+            # 5. Adicionar detalhes do evento
+            participant_data.update(event_details)
+            
+            # 6. Adicionar dados de emissão
+            from datetime import datetime
+            participant_data["data_emissao"] = datetime.now().strftime("%d/%m/%Y")
+            participant_data["cidade"] = "Florianópolis"  # Pode ser configurável
+            
+            # 7. Gerar código de autenticação
+            auth_code = self.auth_manager.gerar_codigo_autenticacao(
+                participant_data["nome"], 
+                event_details.get("evento", "Evento")
+            )
+            
+            # 8. Salvar código de autenticação localmente (método original)
+            self.auth_manager.salvar_codigo(
+                auth_code,
+                participant_data["nome"],
+                event_details.get("evento", "Evento"),
+                event_details.get("data", ""),
+                event_details.get("local", ""),
+                event_details.get("carga_horaria", "")
+            )
+            
+            participant_data["codigo_verificacao"] = auth_code
+            participant_data["url_verificacao"] = "https://nepemufsc.com/verificar"
+            
+            # 9. Mesclar com parâmetros do sistema
+            final_data = self.parameter_manager.merge_placeholders(participant_data, theme_name)
+            
+            # 10. Armazenar no sistema offline para sincronização posterior
+            certificate_data_for_sync = {
+                'codigo_autenticacao': auth_code,
+                'nome_participante': participant_data["nome"],
+                'evento': event_details.get("evento", "Evento"),
+                'data_evento': event_details.get("data", ""),
+                'local_evento': event_details.get("local", ""),
+                'carga_horaria': event_details.get("carga_horaria", ""),
+                'coordenador': final_data.get("coordenador", ""),
+                'diretor': final_data.get("diretor", ""),
+                'data_geracao': datetime.now().isoformat(),
+                'url_verificacao': "https://nepemufsc.com/verificar-certificados",
+                'qrcode_base64': self.auth_manager.gerar_qrcode_base64(auth_code),
+                'template_usado': template_name,
+                'tema_usado': theme_name or "default"
+            }
+            
+            # 11. Armazenar para sincronização offline
+            sync_stored = self.offline_sync_manager.store_certificate(certificate_data_for_sync)
+            if not sync_stored:
+                result["error"] = f"Falha ao armazenar certificado para sincronização offline"
+                return result
+            
+            # 12. Renderizar template
+            html_content = self.template_manager.render_template_from_string(template_content, final_data)
+            
+            # 13. Gerar QR code e substituir placeholder
+            qr_base64 = self.auth_manager.gerar_qrcode_base64(auth_code)
+            html_content = self.auth_manager.substituir_qr_placeholder(html_content, qr_base64)
+            
+            # 14. Preparar nome do arquivo
+            safe_name = self._sanitize_filename(participant_data["nome"])
+            pdf_filename = f"certificado_{safe_name}.pdf"
+            pdf_path = os.path.join(self.output_dir, pdf_filename)
+            
+            # 15. Gerar PDF
+            generated_path = self.pdf_generator.generate_pdf(
+                html_content, 
+                pdf_path, 
+                orientation="landscape"
+            )
+            
+            if generated_path:
+                result["success"] = True
+                result["generated_file"] = generated_path
+            else:
+                result["error"] = "Falha na geração do PDF"
+            
+        except Exception as e:
+            result["error"] = f"Erro na geração do certificado: {str(e)}"
+        
+        return result
