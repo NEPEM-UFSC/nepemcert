@@ -689,7 +689,7 @@ def test_certificate_generation():
     )    # O código de verificação curto foi depreciado, usando o próprio código de autenticação completo
     codigo_verificacao = codigo_autenticacao
     
-    url_base = "https://nepemufsc.com/verificar-certificados"
+    url_base = "https://certificados.nepemufsc.com"
     qrcode_url = auth_manager.gerar_qrcode_data(codigo_autenticacao)
     
     # Salvar informações do certificado de teste
@@ -1621,7 +1621,7 @@ def debug_compare_themes():
     # Usa o próprio código de autenticação como código de verificação
     codigo_verificacao_exemplo = codigo_autenticacao_exemplo
     # Gera a URL base para verificação (sem o código)
-    url_verificacao_exemplo = "https://nepemufsc.com/verificar-certificados"
+    url_verificacao_exemplo = "https://certificados.nepemufsc.com-certificados"
     # Gera a URL completa para o QR code (com o código como parâmetro)
     qrcode_url_exemplo = auth_manager.gerar_qrcode_data(codigo_autenticacao_exemplo)
     
@@ -2348,7 +2348,7 @@ def debug_generate_certificate_for_theme(tema_nome):
         # Gerar código de autenticação
         auth_code = auth_manager.gerar_codigo_autenticacao(dados_teste["nome"], dados_teste["evento"])
         dados_teste["codigo_verificacao"] = auth_code
-        dados_teste["url_verificacao"] = "https://nepemufsc.com/verificar"
+        dados_teste["url_verificacao"] = "https://certificados.nepemufsc.com"
         
         # Mesclar com parâmetros do sistema
         dados_finais = param_manager.merge_placeholders(dados_teste, tema_nome)
