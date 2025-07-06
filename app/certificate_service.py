@@ -116,7 +116,7 @@ class CertificateService:
                     )
                     
                     participant_data["codigo_verificacao"] = auth_code
-                    participant_data["url_verificacao"] = "https://nepemufsc.com/verificar"
+                    participant_data["url_verificacao"] = "https://certificados.nepemufsc.com"
                     
                     # Mesclar com parâmetros do sistema ANTES de usar final_data
                     final_data = self.parameter_manager.merge_placeholders(participant_data, theme_name)
@@ -132,7 +132,7 @@ class CertificateService:
                         'coordenador': final_data.get("coordenador", ""),
                         'diretor': final_data.get("diretor", ""),
                         'data_geracao': datetime.now().isoformat(),
-                        'url_verificacao': "https://nepemufsc.com/verificar-certificados",
+                        'url_verificacao': "https://certificados.nepemufsc.com",
                         'qrcode_base64': self.auth_manager.gerar_qrcode_base64(auth_code),
                         'template_usado': template_name,
                         'tema_usado': theme_name or "default"
@@ -265,7 +265,7 @@ class CertificateService:
             )
             
             participant_data["codigo_verificacao"] = auth_code
-            participant_data["url_verificacao"] = "https://nepemufsc.com/verificar"
+            participant_data["url_verificacao"] = "https://certificados.nepemufsc.com"
             
             # 9. Mesclar com parâmetros do sistema
             final_data = self.parameter_manager.merge_placeholders(participant_data, theme_name)
@@ -281,7 +281,7 @@ class CertificateService:
                 'coordenador': final_data.get("coordenador", ""),
                 'diretor': final_data.get("diretor", ""),
                 'data_geracao': datetime.now().isoformat(),
-                'url_verificacao': "https://nepemufsc.com/verificar-certificados",
+                'url_verificacao': "https://certificados.nepemufsc.com",
                 'qrcode_base64': self.auth_manager.gerar_qrcode_base64(auth_code),
                 'template_usado': template_name,
                 'tema_usado': theme_name or "default"

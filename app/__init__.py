@@ -1,1 +1,5 @@
-# Este arquivo vazio marca o diretório como um pacote Python
+"""
+Pacote principal do NEPEMCERT.
+
+Este módulo inicializa o pacote app e disponibiliza os módulos principais.
+"""

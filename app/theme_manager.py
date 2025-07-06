@@ -13,8 +13,7 @@ from slugify import slugify
 
 # Importar temas pré-definidos do módulo themes.py
 from app.themes import PREDEFINED_THEMES
-from app.utils import load_json_with_comments
-
+from app.utils.app_utils import load_json_with_comments
 class ThemeManager:
     def __init__(self, themes_dir="themes"):
         """

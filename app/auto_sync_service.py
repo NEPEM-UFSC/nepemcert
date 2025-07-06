@@ -56,7 +56,7 @@ class AutoSyncService:
     """
     
     def __init__(self, 
-                 server_url: str = "https://nepemufsc.com/api",
+                 server_url: str = "https://certificados.nepemufsc.com/functions/api-check",
                  check_interval: int = 30,
                  batch_size: int = 10,
                  max_concurrent: int = 3):
