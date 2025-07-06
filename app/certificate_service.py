@@ -154,12 +154,12 @@ class CertificateService:
                     
                     # Preparar nome do arquivo
                     safe_name = self._sanitize_filename(participant_data["nome"])
-                    pdf_filename = f"certificado_{safe_name}_{index + 1}.pdf"
+                    pdf_filename = f"certificado_{safe_name}_{int(index) + 1}.pdf" # type: ignore
                     pdf_path = os.path.join(self.output_dir, pdf_filename)
                     file_paths.append(pdf_path)
                     
                 except Exception as e:
-                    result["errors"].append(f"Error processing participant {index + 1}: {str(e)}")
+                    result["errors"].append(f"Error processing participant {int(index) + 1}: {str(e)}") # type: ignore
                     result["failed_count"] += 1
                     continue
             

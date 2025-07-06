@@ -54,8 +54,8 @@ class CertificateRecord:
     sync_attempts: int = 0
     last_sync_attempt: Optional[str] = None
     error_message: Optional[str] = None
-    created_at: str = None
-    updated_at: str = None
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
     
     def __post_init__(self):
         """Pós-processamento após inicialização."""

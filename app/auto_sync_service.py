@@ -11,7 +11,7 @@ import requests
 import json
 import logging
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Callable
+from typing import Dict, List, Optional, Callable, Any
 from dataclasses import dataclass
 from enum import Enum
 
@@ -364,12 +364,12 @@ class AutoSyncService:
             logger.error(f"Erro inesperado na sincronização: {e}")
             return False
     
-    def force_sync(self) -> Dict[str, int]:
+    def force_sync(self) -> Dict[str, object]:
         """
         Força uma sincronização imediata de todos os certificados pendentes.
         
         Returns:
-            Dict[str, int]: Resultado da sincronização.
+            Dict[str, object]: Resultado da sincronização.
         """
         logger.info("Forçando sincronização imediata")
         
@@ -418,12 +418,12 @@ class AutoSyncService:
             # Restaurar rate limiting
             self.min_sync_interval = original_interval
     
-    def get_service_status(self) -> Dict[str, any]:
+    def get_service_status(self) -> Dict[str, Any]:
         """
         Obtém o status atual do serviço.
         
         Returns:
-            Dict[str, any]: Status detalhado do serviço.
+            Dict[str, Any]: Status detalhado do serviço.
         """
         uptime = None
         if self.stats['service_start_time']:

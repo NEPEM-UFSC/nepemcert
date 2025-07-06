@@ -16,6 +16,7 @@ import json
 import base64
 import io
 import qrcode
+import qrcode.constants
 from PIL import Image
 
 class AuthenticationManager:
@@ -136,7 +137,7 @@ class AuthenticationManager:
         
         # Converter para base64
         buffered = io.BytesIO()
-        img.save(buffered, format="PNG")
+        img.save(buffered)
         img_str = base64.b64encode(buffered.getvalue()).decode('utf-8')
         
         return f"data:image/png;base64,{img_str}"
