@@ -16,6 +16,7 @@ import json
 import base64
 import io
 import qrcode
+from qrcode.constants import ERROR_CORRECT_L
 from PIL import Image
 import sqlite3
 
@@ -161,10 +162,9 @@ class CertAuthenticationManager:
         # Gerar a URL completa
         url = self.gerar_qrcode_data(codigo_autenticacao, url_base)
         
-        # Configurar o QR code
         qr = qrcode.QRCode(
             version=1,
-            error_correction=qrcode.constants.ERROR_CORRECT_L,
+            error_correction=ERROR_CORRECT_L,
             box_size=box_size,
             border=border,
         )
@@ -178,7 +178,7 @@ class CertAuthenticationManager:
         
         # Converter para base64
         buffered = io.BytesIO()
-        img.save(buffered, format="PNG")
+        img.save(buffered, "PNG")
         img_str = base64.b64encode(buffered.getvalue()).decode('utf-8')
         
         return f"data:image/png;base64,{img_str}"

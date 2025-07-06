@@ -535,7 +535,7 @@ def debug_themes(template, output, zip):
     from app.parameter_manager import ParameterManager
     from app.template_manager import TemplateManager
     from app.theme_manager import ThemeManager
-    from app.cert_auth_manager import AuthenticationManager
+    from app.cert_auth_manager import CertAuthenticationManager
     
     console.print(f"[bold blue]🐛 DEBUG: Gerando certificados com todos os temas...[/bold blue]")
     console.print(f"- Template: [cyan]{template}[/cyan]")
@@ -559,7 +559,7 @@ def debug_themes(template, output, zip):
         parameter_manager = ParameterManager()
         template_manager_obj = TemplateManager()
         theme_manager = ThemeManager()
-        auth_manager = AuthenticationManager()
+        auth_manager = CertAuthenticationManager()
         
         # Dados para geração de código de autenticação
         nome_exemplo = "Maria Clara Desenvolvimento"
