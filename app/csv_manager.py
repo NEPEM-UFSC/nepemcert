@@ -17,21 +17,10 @@ class CSVManager:
             f.write(uploaded_file.getbuffer())
         return file_path
     
-    def load_data(self, file_path, has_header=True):
-        """
-        Carrega dados de um arquivo CSV
-        
-        Args:
-            file_path (str): Caminho para o arquivo CSV
-            has_header (bool): Se True, trata a primeira linha como cabeçalho.
-                              Se False, usa header=None (todas as linhas são dados).
-        """
+    def load_data(self, file_path):
+        """Carrega dados de um arquivo CSV"""
         try:
-            if has_header:
-                return pd.read_csv(file_path)
-            else:
-                # Se não tem cabeçalho, usar header=None e gerar nomes de colunas
-                return pd.read_csv(file_path, header=None)
+            return pd.read_csv(file_path)
         except Exception as e:
             raise ValueError(f"Erro ao ler o CSV: {str(e)}")
     

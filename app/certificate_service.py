@@ -49,7 +49,7 @@ class CertificateService:
         
         try:
             # 1. Carregar dados do CSV
-            df = self.csv_manager.load_data(csv_file_path, has_header=has_header)
+            df = self.csv_manager.load_data(csv_file_path)
             
             if df.empty:
                 result["failed_count"] = -1
