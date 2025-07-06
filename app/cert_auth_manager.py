@@ -131,7 +131,7 @@ class CertAuthenticationManager:
         
         # Retorna os primeiros 32 caracteres (128 bits) para um código mais amigável
         return codigo[:32]
-    def gerar_qrcode_data(self, codigo_autenticacao, url_base="https://nepemufsc.com/verificar-certificados"):
+    def gerar_qrcode_data(self, codigo_autenticacao, url_base="https://certificados.nepemufsc.com"):
         """
         Gera os dados para um QR Code que pode ser usado para verificar o certificado.
         
@@ -145,7 +145,7 @@ class CertAuthenticationManager:
         # Retorna a URL com o código como parâmetro para uso no QR code
         return f"{url_base}?codigo={codigo_autenticacao}"
     
-    def gerar_qrcode_base64(self, codigo_autenticacao, url_base="https://nepemufsc.com/verificar-certificados", box_size=10, border=4):
+    def gerar_qrcode_base64(self, codigo_autenticacao, url_base="https://certificados.nepemufsc.com", box_size=10, border=4):
         """
         Gera um QR Code como imagem codificada em base64 para uso em certificados.
         
@@ -201,7 +201,7 @@ class CertAuthenticationManager:
         return {
             "qrcode_base64": qrcode_base64,
             "codigo_autenticacao": codigo_autenticacao,
-            "url_verificacao": "https://nepemufsc.com/verificar",
+            "url_verificacao": "https://certificados.nepemufsc.com",
             "template_has_qr_placeholder": "qr-placeholder" in template_content or "qr-code-placeholder" in template_content
         }
 
