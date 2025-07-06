@@ -13,37 +13,25 @@ from pathlib import Path
 # Adicionar o diretório raiz do projeto ao sys.path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
-from app.cert_auth_manager import AuthenticationManager
+from app.cert_auth_manager import CertAuthenticationManager
 
-class TestAuthenticationManager(unittest.TestCase):
+class TestCertAuthenticationManager(unittest.TestCase):
 
     def setUp(self):
         """Configura um banco de dados SQLite em memória para cada teste."""
-        self.db_path = ":memory:"
-        # Mock o os.path.abspath e os.path.dirname para que o db_path seja :memory:
-        # Isso é um pouco complexo porque o db_path é construído no __init__
-        # Uma abordagem mais fácil é passar o db_path para o construtor ou mockar o connect.
+        # Para evitar problemas com o mock, vamos criar uma instância diferente
+        # que usa uma conexão real em memória
+        self.auth_manager = CertAuthenticationManager(salt="test_salt")
         
-        # Vamos mockar sqlite3.connect para sempre usar :memory: para esta classe de teste
-        self.patcher = patch('sqlite3.connect')
-        self.mock_connect = self.patcher.start()
-        
-        # Configurar o mock_connect para retornar uma conexão real em memória
-        # mas precisamos garantir que a mesma conexão seja retornada se chamada múltiplas vezes
-        # no __init__ e em _create_table. Para simplificar, assumimos que __init__
-        # cria a conexão e a armazena em self.conn.
-        
-        self.memory_conn = sqlite3.connect(":memory:")
-        self.memory_conn.row_factory = sqlite3.Row # Definir row_factory aqui também
-        self.mock_connect.return_value = self.memory_conn
-        
-        self.auth_manager = AuthenticationManager(salt="test_salt")
-        # O _create_table já deve ter sido chamado no __init__ do AuthenticationManager
+        # Substituir a conexão por uma em memória
+        self.auth_manager.conn.close()  # Fechar a conexão original
+        self.auth_manager.conn = sqlite3.connect(":memory:")
+        self.auth_manager.conn.row_factory = sqlite3.Row
+        self.auth_manager._create_table()  # Recriar a tabela na nova conexão
 
     def tearDown(self):
-        """Fecha a conexão e para o patcher após cada teste."""
-        self.auth_manager.close_connection() # Usa o método close_connection da classe
-        self.patcher.stop()
+        """Fecha a conexão após cada teste."""
+        self.auth_manager.close_connection()
 
     def test_create_table_idempotency(self):
         """Testa se _create_table pode ser chamado múltiplas vezes sem erro."""
@@ -79,12 +67,10 @@ class TestAuthenticationManager(unittest.TestCase):
         dados = self.auth_manager.verificar_codigo(codigo)
         assert dados is not None
         # Verificar as chaves que realmente existem no dicionário retornado
-        assert "nome" in dados or "nome_participante" in dados
-        # Usar a chave correta dependendo da implementação
-        nome_key = "nome" if "nome" in dados else "nome_participante"
-        assert dados[nome_key] == "João Silva"
+        assert "nome_participante" in dados
+        assert dados["nome_participante"] == "João Silva"
         assert dados["evento"] == "Workshop Python"
-        assert dados["data"] == "15/05/2025"
+        assert dados["data_evento"] == "15/05/2025"
 
     def test_verificar_codigo_nao_existente(self):
         """Testa verificar um código que não existe"""
@@ -133,21 +119,21 @@ class TestAuthenticationManager(unittest.TestCase):
 
     def test_salvar_codigo_sqlite_error(self):
         """Testa o tratamento de erro ao salvar no SQLite."""
-        # Forçar um erro no commit
-        with patch.object(self.auth_manager.conn, 'commit', side_effect=sqlite3.Error("Simulated DB error")):
-            saved = self.auth_manager.salvar_codigo("code", "name", "event", "date", "local", "ch")
-            self.assertFalse(saved)
+        # Fechar a conexão para forçar um erro
+        self.auth_manager.conn.close()
+        
+        # Tentar salvar com conexão fechada deve retornar False
+        saved = self.auth_manager.salvar_codigo("code", "name", "event", "date", "local", "ch")
+        self.assertFalse(saved)
 
     def test_verificar_codigo_sqlite_error(self):
         """Testa o tratamento de erro ao verificar no SQLite."""
-        # Forçar um erro no execute
-        with patch.object(self.auth_manager.conn, 'cursor') as mock_cursor_ctx:
-            mock_cursor = MagicMock()
-            mock_cursor.execute.side_effect = sqlite3.Error("Simulated DB error")
-            mock_cursor_ctx.return_value = mock_cursor
-            
-            retrieved = self.auth_manager.verificar_codigo("some_code")
-            self.assertIsNone(retrieved)
+        # Fechar a conexão para forçar um erro
+        self.auth_manager.conn.close()
+        
+        # Tentar verificar com conexão fechada deve retornar None
+        retrieved = self.auth_manager.verificar_codigo("some_code")
+        self.assertIsNone(retrieved)
 
 if __name__ == '__main__':
     unittest.main()

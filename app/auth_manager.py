@@ -16,7 +16,7 @@ from typing import Optional, Dict, Any
 from pathlib import Path
 from datetime import datetime, timedelta
 import keyring
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 import hashlib
 import base64
 
@@ -29,13 +29,15 @@ class ClientCredentials(BaseModel):
     created_at: datetime = Field(default_factory=datetime.now)
     last_used: Optional[datetime] = None
     
-    @validator('client_id')
+    @field_validator('client_id')
+    @classmethod
     def validate_client_id(cls, v):
         if not v or len(v) < 10:
             raise ValueError('Client ID deve ter pelo menos 10 caracteres')
         return v
     
-    @validator('client_key')
+    @field_validator('client_key')
+    @classmethod
     def validate_client_key(cls, v):
         if not v or len(v) < 32:
             raise ValueError('Client key deve ter pelo menos 32 caracteres')

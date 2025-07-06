@@ -249,6 +249,7 @@ class CertAuthenticationManager:
         except sqlite3.Error as e:
             print(f"Erro ao salvar código de autenticação no SQLite: {e}")
             return False
+            return False
     
     def substituir_qr_placeholder(self, html_content, qrcode_base64):
         """
@@ -294,7 +295,7 @@ class CertAuthenticationManager:
         """
         try:
             cursor = self.conn.cursor()
-            cursor.execute("SELECT * FROM auth_codes WHERE codigo_autenticacao = ?", (codigo[:32],)) # Ensure we use the same length as before if it was truncated
+            cursor.execute("SELECT * FROM auth_codes WHERE codigo_autenticacao = ?", (codigo,))
             row = cursor.fetchone()
             
             if row:
