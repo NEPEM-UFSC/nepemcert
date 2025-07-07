@@ -55,7 +55,8 @@ class CertificateService:
                 result["failed_count"] = -1
                 result["errors"].append("CSV file is empty or could not be loaded")
                 return result
-              # 2. Processar cabeçalho se necessário
+                
+            # 2. Processar cabeçalho se necessário
             if has_header and len(df) > 0:
                 # Se tem cabeçalho, remover a primeira linha
                 df = df.iloc[1:].reset_index(drop=True)
@@ -94,7 +95,8 @@ class CertificateService:
                     
                     # Adicionar detalhes do evento
                     participant_data.update(event_details)
-                      # Adicionar dados de emissão
+                    
+                    # Adicionar dados de emissão
                     from datetime import datetime
                     participant_data["data_emissao"] = datetime.now().strftime("%d/%m/%Y")
                     participant_data["cidade"] = "Florianópolis"  # Pode ser configurável
@@ -121,6 +123,15 @@ class CertificateService:
                     # Mesclar com parâmetros do sistema ANTES de usar final_data
                     final_data = self.parameter_manager.merge_placeholders(participant_data, theme_name)
                     
+                    # IMPORTANTE: Gerar assinatura ANTES da renderização do template
+                    assinatura_path = os.path.join(os.getcwd(), "app", "auth", "rubrica-olivoto.png")
+                    if os.path.exists(assinatura_path):
+                        rubrica_coordenador = self.auth_manager.gerar_assinatura_base64(assinatura_path)
+                        final_data["signature_image"] = rubrica_coordenador
+                    else:
+                        final_data["signature_image"] = None
+                        result["errors"].append(f"Warning: Signature image not found at {assinatura_path}")
+                    
                     # NOVO: Armazenar no sistema offline para sincronização posterior
                     certificate_data_for_sync = {
                         'codigo_autenticacao': auth_code,
@@ -143,26 +154,24 @@ class CertificateService:
                     if not sync_stored:
                         result["errors"].append(f"Warning: Failed to store {participant_data['nome']} for offline sync")
                     
-                    # Renderizar template
+                    # Renderizar template COM a assinatura já incluída nos dados
                     html_content = self.template_manager.render_template_from_string(template_content, final_data)
                     
-                    # Gerar QR code e substituir placeholder - USAR MÉTODO CORRETO
+                    # Gerar QR code e substituir placeholder
                     qr_base64 = self.auth_manager.gerar_qrcode_base64(auth_code)
                     html_content = self.auth_manager.substituir_qr_placeholder(html_content, qr_base64)
                     
-                    # Gerar assinatura e adicionar no HTML
-                    rubrica_coordenador = self.auth_manager.gerar_assinatura_base64(assinatura_path="/app/auth/rubrica-olivoto.png")
-                    html_content = self.auth_manager.substituir_assinatura_placeholder(html_content,rubrica_coordenador,"signature-image")
+                    # Adicionar o HTML renderizado à lista
                     html_contents.append(html_content)
                     
                     # Preparar nome do arquivo
                     safe_name = self._sanitize_filename(participant_data["nome"])
-                    pdf_filename = f"certificado_{safe_name}_{int(index) + 1}.pdf" # type: ignore
+                    pdf_filename = f"certificado_{safe_name}_{int(index) + 1}.pdf"
                     pdf_path = os.path.join(self.output_dir, pdf_filename)
                     file_paths.append(pdf_path)
                     
                 except Exception as e:
-                    result["errors"].append(f"Error processing participant {int(index) + 1}: {str(e)}") # type: ignore
+                    result["errors"].append(f"Error processing participant {int(index) + 1}: {str(e)}")
                     result["failed_count"] += 1
                     continue
             
@@ -173,7 +182,7 @@ class CertificateService:
                         html_contents, 
                         file_paths, 
                         orientation="landscape",
-                        use_multiprocessing=use_multiprocessing  # Passar o parâmetro
+                        use_multiprocessing=use_multiprocessing
                     )
                     
                     result["generated_files"] = generated_paths
@@ -273,6 +282,15 @@ class CertificateService:
             # 9. Mesclar com parâmetros do sistema
             final_data = self.parameter_manager.merge_placeholders(participant_data, theme_name)
             
+            # 10. Gerar assinatura ANTES da renderização do template
+            assinatura_path = os.path.join(os.getcwd(), "app", "auth", "rubrica-olivoto.png")
+            if os.path.exists(assinatura_path):
+                rubrica_coordenador = self.auth_manager.gerar_assinatura_base64(assinatura_path)
+                final_data["signature_image"] = rubrica_coordenador
+            else:
+                final_data["signature_image"] = None
+                result["error"] = f"Warning: Signature image not found at {assinatura_path}"
+
             # 10. Armazenar no sistema offline para sincronização posterior
             certificate_data_for_sync = {
                 'codigo_autenticacao': auth_code,
