@@ -132,6 +132,7 @@ class CertAuthenticationManager:
         
         # Retorna os primeiros 32 caracteres (128 bits) para um código mais amigável
         return codigo[:32]
+    
     def gerar_qrcode_data(self, codigo_autenticacao, url_base="https://certificados.nepemufsc.com"):
         """
         Gera os dados para um QR Code que pode ser usado para verificar o certificado.
@@ -283,6 +284,7 @@ class CertAuthenticationManager:
             # import sys
             # print(f"QR Code placeholder '{placeholder_tag}' not found in HTML content.", file=sys.stderr)
             return html_content # Return original content if placeholder is not found
+    
     def verificar_codigo(self, codigo):
         """
         Verifica se um código de autenticação é válido.
@@ -337,6 +339,43 @@ class CertAuthenticationManager:
         )
         return codigo
 
+    def gerar_assinatura_base64(self, assinatura_path):
+        """
+        Gera uma assinatura digital em base64 a partir de um arquivo de imagem.
+        
+        Args:
+            assinatura_path (str): Caminho para o arquivo de imagem da assinatura.
+            
+        Returns:
+            str: Assinatura em base64.
+        """
+        try:
+            with open(assinatura_path, "rb") as img_file:
+                return base64.b64encode(img_file.read()).decode('utf-8')
+        except Exception as e:
+            print(f"Erro ao ler assinatura: {e}")
+            return None
+        
+    def substituir_assinatura_placeholder(self, html_content, assinatura_base64, placeholder_id="signature-placeholder"):
+        """
+        Substitui o placeholder de assinatura no HTML pelo conteúdo da assinatura em base64.
+        
+        Args:
+            html_content (str): Conteúdo HTML do template com o placeholder.
+            assinatura_base64 (str): Assinatura em base64 para inserir.
+            placeholder_id (str): ID do placeholder de assinatura no HTML.
+            
+        Returns:
+            str: HTML com a assinatura inserida, ou o HTML original se o placeholder não for encontrado.
+        """
+        placeholder_tag = f'<img id="{placeholder_id}" src="data:image/png;base64,'
+
+        if placeholder_tag in html_content:
+            # Substitui o placeholder pela assinatura em base64
+            new_html_content = html_content.replace(placeholder_tag, f'{placeholder_tag}{assinatura_base64}" alt="Assinatura">')
+            return new_html_content
+        else:
+            return html_content
 
 if __name__ == "__main__":
     # Exemplo de uso
