@@ -150,6 +150,9 @@ class CertificateService:
                     qr_base64 = self.auth_manager.gerar_qrcode_base64(auth_code)
                     html_content = self.auth_manager.substituir_qr_placeholder(html_content, qr_base64)
                     
+                    # Gerar assinatura e adicionar no HTML
+                    rubrica_coordenador = self.auth_manager.gerar_assinatura_base64(assinatura_path="/app/auth/rubrica-olivoto.png")
+                    html_content = self.auth_manager.substituir_assinatura_placeholder(html_content,rubrica_coordenador,"signature-image")
                     html_contents.append(html_content)
                     
                     # Preparar nome do arquivo
