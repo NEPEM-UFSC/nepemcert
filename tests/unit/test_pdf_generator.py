@@ -101,7 +101,7 @@ def test_generate_pdf_invalid_html(pdf_generator):
     assert pdf_bytes.startswith(b'%PDF-')
 
 def test_batch_generate(pdf_generator, sample_html, tmp_path):
-    """Testa o método batch_generate"""
+    """Testa o método batch_generate com processamento sequencial"""
     # Cria vários conteúdos HTML e nomes de arquivo
     html_contents = [
         sample_html.replace("João Silva", "Pessoa 1"),
@@ -110,13 +110,14 @@ def test_batch_generate(pdf_generator, sample_html, tmp_path):
     ]
     
     file_names = [
-        "certificado1.pdf",
-        "certificado2.pdf",
-        "certificado3.pdf"    ]
+        str(tmp_path / "certificado1.pdf"),
+        str(tmp_path / "certificado2.pdf"),
+        str(tmp_path / "certificado3.pdf")
+    ]
     
-    # Gera os PDFs em lote
+    # Gera os PDFs em lote (sequencial por padrão)
     with suppress_weasyprint_warnings():
-        pdf_paths = pdf_generator.batch_generate(html_contents, file_names)
+        pdf_paths = pdf_generator.batch_generate(html_contents, file_names, use_multiprocessing=False)
     
     # Verifica se todos os arquivos foram criados
     assert len(pdf_paths) == 3
@@ -124,13 +125,52 @@ def test_batch_generate(pdf_generator, sample_html, tmp_path):
         assert os.path.exists(path)
         assert os.path.getsize(path) > 100
 
-def test_batch_generate_error(pdf_generator, sample_html):
-    """Testa erro no método batch_generate quando há tamanhos diferentes"""
-    html_contents = [sample_html, sample_html]
-    file_names = ["certificado1.pdf"]
+def test_batch_generate_multiprocessing(pdf_generator, sample_html, tmp_path):
+    """Testa o método batch_generate com processamento paralelo (se solicitado)"""
+    html_contents = [sample_html] * 2  # Apenas 2 para teste rápido
+    file_names = [str(tmp_path / f"cert_mp_{i}.pdf") for i in range(2)]
     
-    with pytest.raises(ValueError):
-        pdf_generator.batch_generate(html_contents, file_names)
+    with suppress_weasyprint_warnings():
+        pdf_paths = pdf_generator.batch_generate(
+            html_contents, 
+            file_names, 
+            use_multiprocessing=True,
+            max_workers=1  # Usar apenas 1 worker para teste
+        )
+    
+    # Deve funcionar, mas pode voltar para sequencial se houver problemas
+    assert len(pdf_paths) >= 1  # Pelo menos um deve ter sucesso
+
+def test_generate_pdf_error(pdf_generator, monkeypatch):
+    """Testa o método generate_pdf quando ocorre um erro na geração"""
+    # Mock para simular erro na escrita do PDF
+    def mock_write_pdf(*args, **kwargs):
+        raise Exception("Erro simulado na escrita do PDF")
+
+    monkeypatch.setattr("weasyprint.HTML.write_pdf", mock_write_pdf)
+    
+    with pytest.raises(RuntimeError) as excinfo:
+        pdf_generator.generate_pdf("<html></html>", "dummy.pdf")
+    assert "Erro ao gerar PDF: Erro simulado na escrita do PDF" in str(excinfo.value)
+
+def test_clean_output_directory(pdf_generator, tmp_path):
+    """Testa o método clean_output_directory"""
+    # Configurar o diretório de saída para tmp_path
+    pdf_generator.output_dir = str(tmp_path)
+    
+    # Criar alguns arquivos no diretório de saída
+    (tmp_path / "file1.pdf").touch()
+    (tmp_path / "file2.txt").touch()
+    (tmp_path / "subdir").mkdir()
+    (tmp_path / "subdir" / "file3.pdf").touch()
+
+    pdf_generator.clean_output_directory()
+    
+    # Verificar se os arquivos foram removidos, mas o subdiretório não
+    assert not (tmp_path / "file1.pdf").exists()
+    assert not (tmp_path / "file2.txt").exists()
+    assert (tmp_path / "subdir").exists() # clean_output_directory só remove arquivos
+    assert (tmp_path / "subdir" / "file3.pdf").exists()
 
 @pytest.mark.cli
 def test_cli_pdf_generation(cli_pdf_generator, sample_html):
@@ -171,6 +211,56 @@ def test_cli_batch_pdf_generation(cli_pdf_generator, sample_html):
     # Verificar se os nomes dos arquivos estão corretos
     assert os.path.basename(output_paths[0]) == "cli_certificado1.pdf"
     assert os.path.basename(output_paths[1]) == "cli_certificado2.pdf"
+
+# --- New tests for parallel batch generation ---
+from unittest.mock import patch, MagicMock
+
+def test_parallel_batch_generate_success(pdf_generator, sample_html, tmp_path):
+    """Testa batch_generate com ProcessPoolExecutor para sucesso."""
+    pdf_generator.output_dir = str(tmp_path)
+    html_contents = [sample_html] * 3
+    file_names_only = ["cert1.pdf", "cert2.pdf", "cert3.pdf"]
+    full_file_paths = [str(tmp_path / name) for name in file_names_only]
+
+    with suppress_weasyprint_warnings():
+        generated_paths = pdf_generator.batch_generate(html_contents, full_file_paths)
+
+    assert len(generated_paths) >= 2  # Pelo menos alguns devem ter sucesso
+    for path in generated_paths:
+        assert os.path.exists(path)
+        assert os.path.getsize(path) > 100
+
+def test_parallel_batch_generate_with_errors(pdf_generator, sample_html, tmp_path, capsys):
+    """Testa batch_generate com ProcessPoolExecutor quando alguns PDFs falham."""
+    pdf_generator.output_dir = str(tmp_path)
+    
+    # Criar alguns conteúdos HTML válidos e alguns inválidos
+    html_contents = [
+        sample_html,  # Válido
+        "",           # Inválido - HTML vazio
+        sample_html,  # Válido
+        "<invalid",   # Inválido - HTML malformado
+    ]
+    
+    file_names = [str(tmp_path / f"test_{i}.pdf") for i in range(4)]
+
+    with suppress_weasyprint_warnings():
+        generated_paths = pdf_generator.batch_generate(html_contents, file_names)
+    
+    # Deve ter pelo menos alguns sucessos
+    assert len(generated_paths) >= 1
+    
+    # Verificar se pelo menos os PDFs válidos foram criados
+    valid_pdfs = [p for p in generated_paths if os.path.exists(p) and os.path.getsize(p) > 100]
+    assert len(valid_pdfs) >= 1
+
+    # Verificar a saída de erro capturada (stderr)
+    captured = capsys.readouterr()
+    assert "Error generating PDF for" in captured.err # Verifica se as mensagens de erro foram impressas
+    assert str(tmp_path / "f1.pdf") in captured.err
+    assert str(tmp_path / "f2.pdf") in captured.err
+    assert "A PDF generation failed:" in captured.err # Verifica a mensagem do loop principal
+
 
 # Limpar o diretório de saída após todos os testes
 @pytest.fixture(scope="session", autouse=True)

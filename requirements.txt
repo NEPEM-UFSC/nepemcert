@@ -1,4 +1,4 @@
-# filepath: c:\Users\mathe\OneDrive\Documentos\GitHub\nepemcert\requirements.txt
+# filepath: ...\nepemcert\requirements.txt
 click==8.1.8
 typer==0.15.4
 rich==14.0.0
@@ -17,3 +17,6 @@ tqdm==4.67.1
 colorama==0.4.6
 pydantic==2.11.5
 qrcode[pil]==8.2
+keyring>=25.6.0
+requests>=2.31.0
+requests

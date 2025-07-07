@@ -76,8 +76,7 @@ class TemplateManager:
         ]
         
         for pattern, message in problematic_patterns:
-            if re.search(pattern, template_content, re.IGNORECASE):
-                warnings.append(message)
+            if re.search(pattern, template_content, re.IGNORECASE):                warnings.append(message)
         
         return warnings
     
@@ -91,6 +90,12 @@ class TemplateManager:
         env = jinja2.Environment(loader=jinja2.FileSystemLoader(os.path.dirname(template_path)))
         template = env.get_template(os.path.basename(template_path))
         
+        return template.render(data)
+    
+    def render_template_from_string(self, template_content, data):
+        """Renderiza um template a partir de conteúdo string com os dados fornecidos"""
+        env = jinja2.Environment()
+        template = env.from_string(template_content)
         return template.render(data)
 
     def save_template_documentation(self, template_name, placeholders_docs):

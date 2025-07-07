@@ -4,7 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Certificado de Participação</title>
-    <style>        @page {
+    <style>
+        @page {
             size: A4 landscape;
             margin: 0;
         }
@@ -19,8 +20,10 @@
             position: relative;
             border: 4px solid #1a5276;
             box-sizing: border-box;
+            /* Background será aplicado pelo tema se configurado */
         }
-          .certificate-container {
+        
+        .certificate-container {
             position: absolute;
             top: 30px;
             left: 30px;
@@ -28,6 +31,8 @@
             bottom: 30px;
             padding: 20px;
             box-sizing: border-box;
+            background: transparent;
+            /* Manter transparente para não sobrepor o background do body */
         }
         
         .title {
@@ -39,6 +44,11 @@
             margin-bottom: 20px;
             text-transform: uppercase;
             letter-spacing: 3px;
+            /* Removido background para ficar transparente */
+            padding: 10px;
+            border-radius: 5px;
+            /* Adicionar sombra de texto para melhor legibilidade */
+            text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.8);
         }
         
         .content {
@@ -48,7 +58,11 @@
             text-align: justify;
             text-indent: 30px;
             color: #333333;
-            padding: 0 40px;
+            padding: 20px 40px;
+            /* Removido background para ficar transparente */
+            border-radius: 10px;
+            /* Adicionar sombra de texto para melhor legibilidade */
+            text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.8);
         }
         
         .participant-name {
@@ -59,13 +73,18 @@
             padding-bottom: 3px;
             margin: 0 8px;
             display: inline-block;
+            /* Adicionar sombra de texto para melhor legibilidade */
+            text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.8);
         }
         
         .event-name {
             font-weight: bold;
             color: #1a5276;
+            /* Adicionar sombra de texto para melhor legibilidade */
+            text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.8);
         }
-          .signatures-container {
+        
+        .signatures-container {
             position: absolute;
             bottom: 120px;
             left: 0;
@@ -78,6 +97,11 @@
         .signature {
             text-align: center;
             width: 200px;
+            /* Removido background para ficar transparente */
+            padding: 10px;
+            border-radius: 5px;
+            /* Adicionar sombra de texto para melhor legibilidade */
+            text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.8);
         }
         
         .signature-line {
@@ -98,7 +122,8 @@
             color: #666;
             font-style: italic;
         }
-          .footer {
+        
+        .footer {
             position: absolute;
             bottom: 30px;
             left: 40px;
@@ -107,12 +132,18 @@
             text-align: center;
             color: #666;
             line-height: 1.4;
+            /* Removido background para ficar transparente */
+            padding: 10px;
+            border-radius: 5px;
+            /* Adicionar sombra de texto para melhor legibilidade */
+            text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.8);
         }
         
         .verification-info {
             margin-bottom: 10px;
         }
-          .emission-info {
+        
+        .emission-info {
             font-size: 9px;
             color: #888;
             font-style: italic;
@@ -127,41 +158,24 @@
         .nepemcert-link:hover {
             text-decoration: underline;
         }
-          .qr-placeholder {
-            position: absolute;
-            bottom: 50px;
-            left: 50px;
-            width: 60px;
-            height: 60px;
-            border: 1px dashed #ccc;
-            background: #f9f9f9;
-            text-align: center;
-            line-height: 60px;
-            font-size: 8px;
-            color: #999;
-        }
         
-        .logo-placeholder {
+        #qr-code-placeholder {
             position: absolute;
-            top: 50px;
-            left: 50px;
-            width: 70px;
-            height: 70px;
-            border: 1px dashed #ccc;
-            background: #f9f9f9;
-            text-align: center;
-            line-height: 70px;
-            font-size: 8px;
-            color: #999;
+            bottom: 110px;
+            left: 110px;
+            width: 120px;
+            height: 120px;
+            /* Removido background para ficar transparente */
+            border-radius: 5px;
+            padding: 5px;
+            box-sizing: border-box;
+            /* Adicionar uma sombra sutil ao QR code para destacá-lo */
+            filter: drop-shadow(2px 2px 4px rgba(0, 0, 0, 0.3));
         }
     </style>
 </head>
 <body>
     <div class="certificate-container">
-        <div class="logo-placeholder">
-            LOGO
-        </div>
-        
         <div class="title">
             {{ title_text|default('CERTIFICADO DE PARTICIPAÇÃO') }}
         </div>
@@ -176,7 +190,8 @@
             {{ workload_text|default('com carga horária total de') }} 
             <strong>{{ carga_horaria }} {{ hours_text|default('horas') }}</strong>.
         </div>
-          <div class="signatures-container">
+        
+        <div class="signatures-container">
             <div class="signature">
                 <div class="signature-line"></div>
                 <div class="signature-name">{{ coordenador }}</div>
@@ -184,14 +199,14 @@
             </div>
         </div>
         
-        <div class="qr-placeholder">
-            QR
-        </div>
-          <div class="footer">
+        <div id="qr-code-placeholder"></div>
+        
+        <div class="footer">
             <div class="verification-info">
                 A autenticidade deste certificado pode ser verificada em: <strong>{{ url_verificacao }}</strong> 
                 com o código <strong>{{ codigo_verificacao }}</strong>.
-            </div>            <div class="emission-info">
+            </div>
+            <div class="emission-info">
                 Este certificado foi emitido em {{ cidade }}, {{ data_emissao }}, utilizando <a href="https://www.github.com/NEPEM-UFSC/nepemcert" class="nepemcert-link" target="_blank" rel="noopener">NEPEMCERT</a>.
             </div>
         </div>

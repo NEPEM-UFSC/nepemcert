@@ -16,9 +16,11 @@ import json
 import base64
 import io
 import qrcode
+from qrcode.constants import ERROR_CORRECT_L
 from PIL import Image
+import sqlite3
 
-class AuthenticationManager:
+class CertAuthenticationManager:
     """
     Gerenciador de códigos de autenticação para certificados.
     
@@ -41,6 +43,47 @@ class AuthenticationManager:
         """
         self.salt = salt or self.DEFAULT_SALT
         
+        # Determine the base directory of the project (nepem-sice)
+        # __file__ is app/authentication_manager.py
+        # os.path.dirname(__file__) is app/
+        # os.path.dirname(os.path.dirname(__file__)) is the project root
+        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        self.db_path = os.path.join(project_root, 'codigos', 'auth_codes.db')
+        
+        # Ensure 'codigos' directory exists
+        os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
+        
+        self.conn = sqlite3.connect(self.db_path)
+        self.conn.row_factory = sqlite3.Row # Access columns by name
+        self._create_table()
+
+    def _create_table(self):
+        """Cria a tabela auth_codes se ela não existir."""
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS auth_codes (
+                    codigo_autenticacao TEXT PRIMARY KEY,
+                    nome_participante TEXT,
+                    evento TEXT,
+                    data_evento TEXT,
+                    local_evento TEXT,
+                    carga_horaria TEXT,
+                    data_geracao TEXT,
+                    url_verificacao TEXT,
+                    qrcode_base64 TEXT
+                )
+            ''')
+            self.conn.commit()
+        except sqlite3.Error as e:
+            print(f"Erro ao criar tabela SQLite: {e}")
+            # Depending on the application, might want to raise this or handle more gracefully
+
+    def close_connection(self):
+        """Fecha a conexão com o banco de dados."""
+        if self.conn:
+            self.conn.close()
+
     def gerar_codigo_autenticacao(self, nome_participante, evento, data_evento=None):
         """
         Gera um código de autenticação único para um certificado.
@@ -89,9 +132,7 @@ class AuthenticationManager:
         
         # Retorna os primeiros 32 caracteres (128 bits) para um código mais amigável
         return codigo[:32]
-  
-    
-    def gerar_qrcode_data(self, codigo_autenticacao, url_base="https://nepemufsc.com/verificar-certificados?="):
+    def gerar_qrcode_data(self, codigo_autenticacao, url_base="https://certificados.nepemufsc.com"):
         """
         Gera os dados para um QR Code que pode ser usado para verificar o certificado.
         
@@ -102,9 +143,10 @@ class AuthenticationManager:
         Returns:
             str: URL completa para verificação do certificado.
         """
-        return f"{url_base}{codigo_autenticacao}"
-        
-    def gerar_qrcode_base64(self, codigo_autenticacao, url_base="https://nepemufsc.com/verificar-certificados?=", box_size=10, border=4):
+        # Retorna a URL com o código como parâmetro para uso no QR code
+        return f"{url_base}?codigo={codigo_autenticacao}"
+    
+    def gerar_qrcode_base64(self, codigo_autenticacao, url_base="https://certificados.nepemufsc.com", box_size=10, border=4):
         """
         Gera um QR Code como imagem codificada em base64 para uso em certificados.
         
@@ -120,10 +162,9 @@ class AuthenticationManager:
         # Gerar a URL completa
         url = self.gerar_qrcode_data(codigo_autenticacao, url_base)
         
-        # Configurar o QR code
         qr = qrcode.QRCode(
             version=1,
-            error_correction=qrcode.constants.ERROR_CORRECT_L,
+            error_correction=ERROR_CORRECT_L,
             box_size=box_size,
             border=border,
         )
@@ -137,15 +178,36 @@ class AuthenticationManager:
         
         # Converter para base64
         buffered = io.BytesIO()
-        img.save(buffered, format="PNG")
+        img.save(buffered, "PNG")
         img_str = base64.b64encode(buffered.getvalue()).decode('utf-8')
         
         return f"data:image/png;base64,{img_str}"
     
+    def gerar_qrcode_adaptado(self, codigo_autenticacao, template_content):
+        """
+        Gera QR code e retorna informações adaptadas para o template.
+        
+        Args:
+            codigo_autenticacao (str): Código de autenticação
+            template_content (str): Conteúdo do template HTML
+            
+        Returns:
+            dict: Dicionário com informações do QR code
+        """
+        # Gerar QR code base64
+        qrcode_base64 = self.gerar_qrcode_base64(codigo_autenticacao)
+        
+        # Retornar informações estruturadas
+        return {
+            "qrcode_base64": qrcode_base64,
+            "codigo_autenticacao": codigo_autenticacao,
+            "url_verificacao": "https://certificados.nepemufsc.com",
+            "template_has_qr_placeholder": "qr-placeholder" in template_content or "qr-code-placeholder" in template_content
+        }
+
     def salvar_codigo(self, codigo_autenticacao, nome_participante, evento, data_evento, local_evento, carga_horaria):
         """
-        Salva as informações do certificado associadas ao código de autenticação.
-        Implementação básica - em uma versão real, isso seria salvo em um banco de dados.
+        Salva as informações do certificado associadas ao código de autenticação no banco de dados SQLite.
         
         Args:
             codigo_autenticacao (str): Código de autenticação do certificado.
@@ -158,12 +220,6 @@ class AuthenticationManager:
         Returns:
             bool: True se o código foi salvo com sucesso, False caso contrário.
         """
-        # Diretório para armazenar os códigos
-        codigo_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'codigos')
-        os.makedirs(codigo_dir, exist_ok=True)
-        
-        # Arquivo JSON para armazenar o código
-        codigo_file = os.path.join(codigo_dir, f"{codigo_autenticacao}.json")          # Dados do certificado
         dados = {
             "codigo_autenticacao": codigo_autenticacao,
             "nome_participante": nome_participante,
@@ -173,17 +229,60 @@ class AuthenticationManager:
             "carga_horaria": carga_horaria,
             "data_geracao": datetime.now().isoformat(),
             "url_verificacao": self.gerar_qrcode_data(codigo_autenticacao),
-            "qrcode_base64": self.gerar_qrcode_base64(codigo_autenticacao)
+            "qrcode_base64": self.gerar_qrcode_base64(codigo_autenticacao) # Storing for consistency, though can be regenerated
         }
         
-        # Salva os dados em um arquivo JSON
         try:
-            with open(codigo_file, 'w', encoding='utf-8') as f:
-                json.dump(dados, f, ensure_ascii=False, indent=4)
+            cursor = self.conn.cursor()
+            cursor.execute('''
+                INSERT INTO auth_codes (
+                    codigo_autenticacao, nome_participante, evento, data_evento, 
+                    local_evento, carga_horaria, data_geracao, url_verificacao, qrcode_base64
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                dados["codigo_autenticacao"], dados["nome_participante"], dados["evento"], dados["data_evento"],
+                dados["local_evento"], dados["carga_horaria"], dados["data_geracao"],
+                dados["url_verificacao"], dados["qrcode_base64"]
+            ))
+            self.conn.commit()
             return True
-        except Exception as e:
-            print(f"Erro ao salvar código de autenticação: {e}")
+        except sqlite3.Error as e:
+            print(f"Erro ao salvar código de autenticação no SQLite: {e}")
             return False
+            return False
+    
+    def substituir_qr_placeholder(self, html_content, qrcode_base64):
+        """
+        Substitui o placeholder <div id="qr-code-placeholder"></div> pelo QR code real no HTML.
+        O QR code (imagem) será inserido DENTRO deste div.
+        
+        Args:
+            html_content (str): Conteúdo HTML do template com o placeholder.
+            qrcode_base64 (str): QR code em base64 para inserir.
+            
+        Returns:
+            str: HTML com o QR code inserido, ou o HTML original se o placeholder não for encontrado.
+        """
+        placeholder_tag = '<div id="qr-code-placeholder"></div>'
+        
+        # The image will be styled to take 100% width and height of its container (the placeholder div).
+        # Specific sizing of the QR code should be handled by styling the #qr-code-placeholder div in CSS.
+        qr_image_html = f'<img src="{qrcode_base64}" alt="QR Code de verificação" style="width:100%; height:100%; display:block;">'
+        
+        # Replacement inserts the image inside the div
+        replacement_html = f'<div id="qr-code-placeholder">{qr_image_html}</div>'
+        
+        if placeholder_tag in html_content:
+            # Using simple string replacement as the placeholder is fixed.
+            new_html_content = html_content.replace(placeholder_tag, replacement_html)
+            # Optionally, log that replacement occurred (using print to stderr for simplicity here)
+            # import sys
+            # print(f"QR Code placeholder found and replaced.", file=sys.stderr)
+            return new_html_content
+        else:
+            # import sys
+            # print(f"QR Code placeholder '{placeholder_tag}' not found in HTML content.", file=sys.stderr)
+            return html_content # Return original content if placeholder is not found
     def verificar_codigo(self, codigo):
         """
         Verifica se um código de autenticação é válido.
@@ -194,19 +293,34 @@ class AuthenticationManager:
         Returns:
             dict or None: Dados do certificado se o código for válido, None caso contrário.
         """
-        # Diretório dos códigos
-        codigo_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'codigos')
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute("SELECT * FROM auth_codes WHERE codigo_autenticacao = ?", (codigo,))
+            row = cursor.fetchone()
+            
+            if row:
+                return dict(row) # Convert sqlite3.Row to dict
+            else:
+                return None
+        except sqlite3.Error as e:
+            print(f"Erro ao verificar código no SQLite: {e}")
+            return None
         
-        # Verificar pelo código de autenticação
-        codigo_file = os.path.join(codigo_dir, f"{codigo[:32]}.json")
-        if os.path.exists(codigo_file):
-            try:
-                with open(codigo_file, 'r', encoding='utf-8') as f:
-                    return json.load(f)
-            except Exception:
-                pass
-                
-        return None    @classmethod
+    def gerar_codigo_verificacao(self, codigo_autenticacao):
+        """
+        [DEPRECATED] Essa função está depreciada e será removida em versões futuras.
+        Use apenas o código de autenticação completo.
+        
+        Args:
+            codigo_autenticacao (str): Código de autenticação completo.
+            
+        Returns:
+            str: O mesmo código de autenticação fornecido.
+        """
+        # Função depreciada - retornando apenas o código de autenticação original
+        return codigo_autenticacao
+        
+    @classmethod
     def gerar_codigo_exemplo(cls):
         """
         Gera um exemplo de código de autenticação com dados de exemplo.
@@ -226,7 +340,7 @@ class AuthenticationManager:
 
 if __name__ == "__main__":
     # Exemplo de uso
-    auth_manager = AuthenticationManager()
+    auth_manager =CertAuthenticationManager()
     
     # Gera um código de autenticação
     codigo = auth_manager.gerar_codigo_autenticacao(
@@ -254,7 +368,16 @@ if __name__ == "__main__":
         "Auditório Central",
         "40 horas"
     )
-    
+    # Exemplo de verificação
+    dados_verificados = auth_manager.verificar_codigo(codigo)
+    if dados_verificados:
+        print(f"\nCódigo verificado com sucesso. Nome: {dados_verificados['nome_participante']}")
+    else:
+        print(f"\nFalha ao verificar código: {codigo}")
+
+    # Fechar conexão ao final do uso (importante em aplicações reais)
+    auth_manager.close_connection()
+
     # Para testar a visualização do QR code, podemos criar um HTML simples
     test_html = f"""
     <!DOCTYPE html>

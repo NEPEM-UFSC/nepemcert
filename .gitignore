@@ -180,3 +180,11 @@ copilot-instructions.md
 output/
 
 uploads/
+
+config/parameters.json
+codigos/
+themes/bg/background_images.json
+config/connectivity.json
+config/
+data/offline_sync.db
+config/connectivity.json

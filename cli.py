@@ -5,6 +5,9 @@ Ferramenta para geração de certificados em lote.
 
 import os
 import sys
+import random
+
+from app import themes
 
 # Suprimir avisos verbosos do GLib no Windows
 os.environ['G_MESSAGES_DEBUG'] = ''
@@ -20,7 +23,7 @@ import typer
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
-from rich.progress import Progress, SpinnerColumn, TextColumn
+from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn
 from rich.markdown import Markdown
 from rich.syntax import Syntax
 from rich import box
@@ -35,6 +38,12 @@ import time
 import random
 import string
 from datetime import datetime
+
+from app.cli.cli_debug import debug_system_check, debug_compare_themes
+from app.cli.cli_certificates_menu import generate_certificates_menu, generate_certificate_single
+from app.cli.cli_preview_data import preview_imported_data
+from app.cli.cli_connectivity import connectivity_menu
+
 
 # Configurar questionary para reduzir verbosidade no Windows
 if sys.platform.startswith('win'):
@@ -107,29 +116,28 @@ def quiet_path(message, **kwargs):
 from app.csv_manager import CSVManager
 from app.template_manager import TemplateManager
 from app.pdf_generator import PDFGenerator
-from app.field_mapper import FieldMapper
 from app.zip_exporter import ZipExporter
 from app.connectivity_manager import ConnectivityManager
 from app.parameter_manager import ParameterManager
 from app.theme_manager import ThemeManager
-from app.authentication_manager import AuthenticationManager
+from app.cert_auth_manager import CertAuthenticationManager
+from app.certificate_service import CertificateService # Added CertificateService import
+from app.utils.app_parameters import APP_VERSION
 
 # Configuração do console Rich
 console = Console()
 
-# Versão do aplicativo
-APP_VERSION = "1.1.0"
 
 # Inicialização dos gerenciadores
 csv_manager = CSVManager()
 template_manager = TemplateManager()
 pdf_generator = PDFGenerator()
-field_mapper = FieldMapper()
 zip_exporter = ZipExporter()
 connectivity_manager = ConnectivityManager()
 parameter_manager = ParameterManager()
 theme_manager = ThemeManager()
-auth_manager = AuthenticationManager()
+auth_manager = CertAuthenticationManager()
+certificate_service = CertificateService() # Instantiated CertificateService
 
 
 def check_connection_status():
@@ -174,25 +182,40 @@ def print_header():
     # Reduz espaço entre painéis e menu
     console.print("\n[bold cyan]Gerador de Certificados em Lote[/bold cyan]")
     console.print("[dim]Use os comandos abaixo para gerenciar seus certificados.[/dim]")
+    
+    # Exibir indicador de modo debug no rodapé quando estiver ativado
+    if parameter_manager.get_debug_mode():
+        console.print("\n[bold red]🐛 [DEBUG MODE ATIVADO] 🐛[/bold red]")
 
 
 def main_menu():
     """Exibe o menu principal da aplicação."""
     print_header()
+    
+    # Lista básica de opções do menu
+    menu_options = [
+        "🔖 Gerar Certificados",
+        "🎨 Gerenciar Templates",
+        "⚙️ Configurações",
+        "🔄 Sincronização e Conectividade",
+        "❓ Ajuda",
+        "🚪 Sair"
+    ]
+    
+    # Adicionar opções de debug se o modo debug estiver ativado
+    debug_mode = parameter_manager.get_debug_mode()
+    if debug_mode:
+        # Inserir as opções de debug antes da Ajuda
+        menu_options.insert(-2, "🐛 DEBUG: Comparar temas")
+        menu_options.insert(-2, "🐛 DEBUG: Verificar sistema")
+    
     choice = quiet_select(
         "Selecione uma opção:",
-        choices=[
-            "🔖 Gerar Certificados",
-            "🎨 Gerenciar Templates",
-            "⚙️ Configurações",
-            "🔄 Sincronização e Conectividade",
-            "🐛 DEBUG: Comparar temas",
-            "❓ Ajuda",
-            "🚪 Sair"
-        ],
+        choices=menu_options,
         use_indicator=True,
         style=get_menu_style()
     )
+    
     if choice == "🔖 Gerar Certificados":
         generate_certificates_menu()
     elif choice == "🎨 Gerenciar Templates":
@@ -203,6 +226,8 @@ def main_menu():
         connectivity_menu()
     elif choice == "🐛 DEBUG: Comparar temas":
         debug_compare_themes()
+    elif choice == "🐛 DEBUG: Verificar sistema":
+        debug_system_check()
     elif choice == "❓ Ajuda":
         show_help()
     elif choice == "🚪 Sair":
@@ -210,682 +235,6 @@ def main_menu():
         return False
     
     return True
-
-
-def generate_certificates_menu():
-    """Menu para geração de certificados."""
-    console.clear()
-    console.print("[bold blue]== Geração de Certificados em Lote ==[/bold blue]\n")
-    choice = quiet_select(
-        "O que você deseja fazer?",
-        choices=[
-            "📄 Gerar certificados em lote",
-            "📋 Visualizar dados importados",
-            "🔍 Testar geração com um único registro",
-            "🔐 Verificar código de autenticação",
-            "↩️ Voltar ao menu principal"
-        ],
-        style=get_menu_style()
-    )
-    
-    if choice == "📄 Gerar certificados em lote":
-        generate_batch_certificates()
-    elif choice == "📋 Visualizar dados importados":
-        preview_imported_data()
-    elif choice == "🔍 Testar geração com um único registro":
-        test_certificate_generation()
-    elif choice == "🔐 Verificar código de autenticação":
-        verify_authentication_code()
-    elif choice == "↩️ Voltar ao menu principal":
-        return
-
-
-def manage_templates_menu():
-    """Menu para gerenciamento de templates."""
-    console.clear()
-    console.print("[bold blue]== Gerenciamento de Templates ==[/bold blue]\n")
-    
-    choice = quiet_select(
-        "O que você deseja fazer?",
-        choices=[
-            "📝 Listar templates disponíveis",
-            "➕ Importar novo template",
-            "🖌️ Editar template existente",
-            "🗑️ Excluir template",
-            "👁️ Visualizar template",
-            "↩️ Voltar ao menu principal"
-        ],
-        style=get_menu_style()
-    )
-    
-    if choice == "📝 Listar templates disponíveis":
-        list_templates()
-    elif choice == "➕ Importar novo template":
-        import_template()
-    elif choice == "🖌️ Editar template existente":
-        edit_template()
-    elif choice == "🗑️ Excluir template":
-        delete_template()
-    elif choice == "👁️ Visualizar template":
-        preview_template()
-    elif choice == "↩️ Voltar ao menu principal":
-        return
-
-
-def settings_menu():
-    """Menu de configurações."""
-    console.clear()
-    console.print("[bold blue]== Configurações ==[/bold blue]\n")
-    
-    choice = quiet_select(
-        "O que você deseja configurar?",
-        choices=[
-            "📁 Diretórios de trabalho",
-            "🎨 Aparência e tema",
-            "📊 Parâmetros de geração",
-            "💾 Salvar/carregar presets",
-            "↩️ Voltar ao menu principal"
-        ],
-        style=get_menu_style()
-    )
-    
-    if choice == "📁 Diretórios de trabalho":
-        configure_directories()
-    elif choice == "🎨 Aparência e tema":
-        configure_appearance()
-    elif choice == "📊 Parâmetros de geração":
-        configure_generation_parameters()
-    elif choice == "💾 Salvar/carregar presets":
-        manage_presets()
-    elif choice == "↩️ Voltar ao menu principal":
-        return
-
-
-def connectivity_menu():
-    """Menu de conectividade e sincronização."""
-    console.clear()
-    console.print("[bold blue]== Sincronização e Conectividade ==[/bold blue]\n")
-    
-    choice = quiet_select(
-        "O que você deseja fazer?",
-        choices=[
-            "🔄 Verificar status da conexão",
-            "📡 Configurar servidor remoto",
-            "⬆️ Enviar certificados para servidor",
-            "⬇️ Baixar templates do servidor",
-            "🔒 Configurar credenciais",
-            "↩️ Voltar ao menu principal"
-        ],
-        style=get_menu_style()
-    )
-    
-    if choice == "🔄 Verificar status da conexão":
-        check_connection()
-    elif choice == "📡 Configurar servidor remoto":
-        configure_remote_server()
-    elif choice == "⬆️ Enviar certificados para servidor":
-        upload_certificates()
-    elif choice == "⬇️ Baixar templates do servidor":
-        download_templates()
-    elif choice == "🔒 Configurar credenciais":
-        configure_credentials()
-    elif choice == "↩️ Voltar ao menu principal":
-        return
-
-
-def show_help():
-    """Exibe informações de ajuda."""
-    console.clear()
-    
-    help_text = """
-    # Ajuda do NEPEM Cert
-    
-    ## Como usar
-    
-    O NEPEM Cert é uma ferramenta para geração de certificados em lote. Você pode:
-    
-    1. **Gerar Certificados em Lote**:
-       - Importe um CSV com os nomes dos participantes
-       - Forneça detalhes do evento (nome, data, local, carga horária)
-       - Selecione um template HTML
-       - Gere os certificados com códigos de verificação únicos
-    
-    2. **Gerenciar Templates**:
-       - Crie, edite e visualize templates HTML
-       - Use placeholders para campos dinâmicos
-    
-    3. **Configurações**:
-       - Defina diretórios de trabalho
-       - Configure parâmetros de geração
-    
-    4. **Conectividade**:
-       - Sincronize com servidor remoto
-       - Importe/exporte templates e certificados
-    
-    ## Contato e Suporte
-    
-    Para mais informações ou suporte, entre em contato:
-    - Email: contato@nepem.com
-    - Site: www.nepem.com
-    """
-    
-    md = Markdown(help_text)
-    console.print(md)
-    console.print("\n[dim]Pressione Enter para voltar ao menu principal...[/dim]")
-    input()
-
-
-def get_menu_style():
-    """Retorna o estilo padrão para menus de questionary."""
-    return questionary.Style([
-        ('selected', 'bg:#0066cc #ffffff bold'),
-        ('highlighted', 'fg:#0066cc bold'),
-        ('instruction', 'fg:#0A1128'),
-        ('pointer', 'fg:#0066cc bold'),
-        ('answer', 'fg:#0066cc bold'),
-    ])
-
-
-# Função de geração de certificados implementada conforme o fluxo solicitado
-def generate_batch_certificates():
-    """Gera certificados em lote."""
-    console.clear()
-    console.print("[bold blue]== Geração de Certificados em Lote ==[/bold blue]\n")
-      # Selecionar arquivo CSV
-    csv_path = quiet_path(
-        "Selecione o arquivo CSV com nomes dos participantes:",
-        validate=lambda path: os.path.exists(path) and path.endswith('.csv')
-    )
-    
-    if not csv_path:
-        console.print("[yellow]Operação cancelada.[/yellow]")
-        return
-    
-    # Verificar se o CSV tem cabeçalho
-    has_header = quiet_confirm("O arquivo CSV possui linha de cabeçalho?")
-    
-    # Carregar dados do CSV
-    with console.status("[bold green]Carregando dados do CSV..."):
-        try:
-            if has_header:
-                df = pd.read_csv(csv_path)
-            else:
-                df = pd.read_csv(csv_path, header=None, names=["nome"])
-            
-            # Verificar se o CSV tem apenas uma coluna
-            if len(df.columns) > 1:
-                console.print("[bold red]Erro:[/bold red] O arquivo CSV deve conter apenas uma coluna com os nomes dos participantes.")
-                console.print(f"Colunas encontradas: {', '.join(df.columns)}")
-                return
-            
-            # Garantir que a coluna se chame "nome" para compatibilidade
-            if df.columns[0] != "nome":
-                df.columns = ["nome"]
-            
-            num_records = len(df)
-            console.print(f"[green]✓[/green] Dados carregados com sucesso. {num_records} participantes encontrados.")
-        except Exception as e:
-            console.print(f"[bold red]Erro ao carregar CSV:[/bold red] {str(e)}")
-            return
-    
-    # Solicitar informações do evento
-    console.print("\n[bold]Informações do Evento[/bold]")
-    evento = quiet_text("Nome do evento:")
-    data = quiet_text("Data do evento (ex: 15/05/2023):", default=datetime.now().strftime("%d/%m/%Y"))
-    local = quiet_text("Local do evento:")
-    carga_horaria = quiet_text("Carga horária (horas):")
-    
-    # Revisar informações
-    while True:
-        console.clear()
-        console.print("[bold blue]== Revisão das Informações do Evento ==[/bold blue]\n")
-        
-        table = Table(box=box.SIMPLE)
-        table.add_column("Campo", style="cyan")
-        table.add_column("Valor")
-        
-        table.add_row("Nome do evento", evento)
-        table.add_row("Data", data)
-        table.add_row("Local", local)
-        table.add_row("Carga horária", f"{carga_horaria} horas")
-        table.add_row("Número de participantes", str(num_records))
-        
-        console.print(table)
-        
-        # Perguntar se deseja modificar algo
-        choice = quiet_select(
-            "Deseja modificar alguma informação?",
-            choices=[
-                "Não, continuar",
-                "Modificar nome do evento",
-                "Modificar data",
-                "Modificar local",
-                "Modificar carga horária",
-                "Cancelar operação"
-            ],
-            style=get_menu_style()
-        )
-        
-        if choice == "Não, continuar":
-            break
-        elif choice == "Modificar nome do evento":
-            evento = quiet_text("Nome do evento:", default=evento)
-        elif choice == "Modificar data":
-            data = quiet_text("Data do evento:", default=data)
-        elif choice == "Modificar local":
-            local = quiet_text("Local do evento:", default=local)
-        elif choice == "Modificar carga horária":
-            carga_horaria = quiet_text("Carga horária (horas):", default=carga_horaria)
-        elif choice == "Cancelar operação":
-            console.print("[yellow]Operação cancelada.[/yellow]")
-            return
-    
-    # Selecionar template
-    templates = template_manager.list_templates()
-    if not templates:
-        console.print("[yellow]Nenhum template disponível. Por favor, importe um template primeiro.[/yellow]")
-        return
-    template_name = quiet_select(
-        "Selecione o template a ser utilizado:",
-        choices=templates,
-        style=get_menu_style()
-    )
-    
-    if not template_name:
-        console.print("[yellow]Operação cancelada.[/yellow]")
-        return
-    
-    # Selecionar tema
-    themes = ["Nenhum"] + theme_manager.list_themes()
-    selected_theme = quiet_select(
-        "Selecione um tema para os certificados:",
-        choices=themes,
-        style=get_menu_style()
-    )
-    
-    theme = None if selected_theme == "Nenhum" else selected_theme
-    
-    # Carregar template
-    with console.status("[bold green]Carregando template..."):
-        template_content = template_manager.load_template(template_name)
-        if not template_content:
-            console.print(f"[bold red]Erro ao carregar template:[/bold red] Arquivo não encontrado.")
-            return
-        
-        # Aplicar tema se selecionado
-        if theme:
-            theme_settings = theme_manager.load_theme(theme)
-            if theme_settings:
-                template_content = theme_manager.apply_theme_to_template(template_content, theme_settings)
-                console.print(f"[green]✓[/green] Tema '{theme}' aplicado ao template.")
-    
-    # Mostrar e revisar parâmetros institucionais
-    institutional_params = parameter_manager.get_institutional_placeholders()
-    
-    console.print("\n[bold]Parâmetros Institucionais[/bold]")
-    if institutional_params:
-        table = Table(box=box.SIMPLE)
-        table.add_column("Campo", style="cyan")
-        table.add_column("Valor")
-        
-        for campo, valor in institutional_params.items():
-            table.add_row(campo, valor)
-        
-        console.print(table)
-        
-        # Perguntar se deseja modificar os parâmetros
-        modify = quiet_confirm("Deseja modificar os parâmetros institucionais?")
-        
-        if modify:
-            for campo, valor in institutional_params.items():
-                novo_valor = quiet_text(f"{campo}:", default=valor)
-                institutional_params[campo] = novo_valor
-            
-            # Atualizar parâmetros
-            parameter_manager.update_institutional_placeholders(institutional_params)
-            console.print("[green]✓[/green] Parâmetros institucionais atualizados.")
-    else:
-        console.print("[yellow]Nenhum parâmetro institucional configurado.[/yellow]")
-      # Configurar diretório de saída
-    output_dir = quiet_path(
-        "Pasta de destino para os certificados:",
-        default=pdf_generator.output_dir,
-        only_directories=True
-    )
-    
-    if not output_dir:
-        output_dir = pdf_generator.output_dir
-    else:
-        # Atualizar o diretório de saída do gerador de PDF
-        pdf_generator.output_dir = output_dir
-        # Garantir que o diretório exista
-        os.makedirs(output_dir, exist_ok=True)
-    
-    # Confirmação final
-    console.print("\n[bold]Resumo da operação:[/bold]")
-    console.print(f"- Evento: [cyan]{evento}[/cyan]")
-    console.print(f"- Data: [cyan]{data}[/cyan]")
-    console.print(f"- Local: [cyan]{local}[/cyan]")
-    console.print(f"- Carga horária: [cyan]{carga_horaria} horas[/cyan]")
-    console.print(f"- Participantes: [cyan]{num_records}[/cyan]")
-    console.print(f"- Template: [cyan]{template_name}[/cyan]")
-    console.print(f"- Tema: [cyan]{selected_theme}[/cyan]")
-    console.print(f"- Destino: [cyan]{output_dir}[/cyan]")
-    
-    confirm = quiet_confirm("Deseja iniciar a geração dos certificados?")
-    
-    if not confirm:
-        console.print("[yellow]Operação cancelada.[/yellow]")
-        return
-    
-    # Gerar certificados
-    html_contents = []
-    file_names = []
-    
-    # Preparar informações comuns para todos os certificados
-    common_data = {
-        "evento": evento,
-        "data": data,
-        "local": local,
-        "carga_horaria": carga_horaria,
-    }
-    
-    # Extrair placeholders do template
-    placeholders = template_manager.extract_placeholders(template_content)
-    console.print(f"\n[bold]Placeholders encontrados no template:[/bold] {len(placeholders)}")
-    
-    with Progress(
-        SpinnerColumn(),
-        TextColumn("[progress.description]{task.description}"),
-        transient=False
-    ) as progress:
-        task = progress.add_task(f"[green]Gerando certificados...", total=num_records)
-        
-        for index, row in df.iterrows():
-            progress.update(task, description=f"[green]Processando certificado {index+1}/{num_records}...")
-              # Combinar dados do participante com as informações comuns
-            participante_data = {"nome": row["nome"]}
-            
-            # Gerar código de autenticação único usando nosso gerenciador
-            codigo_autenticacao = auth_manager.gerar_codigo_autenticacao(
-                nome_participante=participante_data['nome'],
-                evento=evento,
-                data_evento=data
-            )
-            
-            # Gerar código de verificação mais curto para exibição
-            codigo_verificacao = auth_manager.gerar_codigo_verificacao(codigo_autenticacao)
-            
-            # Salvar informações do certificado
-            auth_manager.salvar_codigo(
-                codigo_autenticacao=codigo_autenticacao,
-                nome_participante=participante_data['nome'],
-                evento=evento,
-                data_evento=data,
-                local_evento=local,
-                carga_horaria=carga_horaria
-            )
-            
-            # Gerar URL para QR Code (se aplicável)
-            qrcode_url = auth_manager.gerar_qrcode_data(codigo_autenticacao)
-            
-            # Adicionar códigos aos dados do participante
-            participante_data["codigo_autenticacao"] = codigo_autenticacao
-            participante_data["codigo_verificacao"] = codigo_verificacao
-            participante_data["url_verificacao"] = qrcode_url
-            
-            # Adicionar data de emissão
-            participante_data["data_emissao"] = datetime.now().strftime("%d/%m/%Y")
-            
-            # Mesclar todos os dados
-            csv_data = {**common_data, **participante_data}
-            final_data = parameter_manager.merge_placeholders(csv_data, theme)
-            
-            # Gerar nome do arquivo
-            file_name = f"certificado_{participante_data['nome'].strip().replace(' ', '_')}.pdf"
-            file_path = os.path.join(output_dir, file_name)
-            
-            # Preparar template temporário para renderização
-            temp_name = f"temp_{random.randint(1000, 9999)}.html"
-            temp_path = os.path.join("templates", temp_name)
-            
-            try:
-                # Salvar template temporário
-                with open(temp_path, "w", encoding="utf-8") as f:
-                    f.write(template_content)
-                
-                # Renderizar template com os dados
-                html_content = template_manager.render_template(temp_name, final_data)
-                
-                # Adicionar à lista para geração em lote
-                html_contents.append(html_content)
-                file_names.append(file_path)
-            except Exception as e:
-                console.print(f"[bold red]Erro ao processar certificado {index+1}:[/bold red] {str(e)}")
-            finally:
-                # Limpar arquivo temporário
-                if os.path.exists(temp_path):
-                    os.remove(temp_path)
-            
-            progress.update(task, advance=1)
-    
-    # Gerar PDFs em lote
-    console.print("\n[bold]Gerando arquivos PDF...[/bold]")
-    
-    try:        
-        generated_paths = pdf_generator.batch_generate(html_contents, file_names, orientation='landscape')
-        console.print(f"[bold green]✓ {len(generated_paths)} certificados gerados com sucesso![/bold green]")
-        
-        # Oferecer opção para criar ZIP
-        zip_option = quiet_confirm("Deseja empacotar os certificados em um arquivo ZIP?")
-        
-        if zip_option:
-            zip_name = quiet_text(
-                "Nome do arquivo ZIP:",
-                default=f"{evento.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.zip"
-            )
-            
-            if not zip_name.endswith('.zip'):
-                zip_name += '.zip'
-                
-            zip_path = os.path.join(output_dir, zip_name)
-            
-            # Criar arquivo ZIP
-            with console.status("[bold green]Criando arquivo ZIP..."):
-                zip_exporter.create_zip(generated_paths, zip_path)
-            
-            console.print(f"[bold green]✓ Arquivo ZIP criado em:[/bold green] {zip_path}")
-    
-    except Exception as e:
-        console.print(f"[bold red]Erro ao gerar certificados:[/bold red] {str(e)}")
-    
-    console.print("\n[dim]Pressione Enter para voltar ao menu...[/dim]")
-    input()
-
-
-def preview_imported_data():
-    """Visualiza dados importados de um CSV."""
-    console.clear()
-    console.print("[bold blue]== Visualização de Dados Importados ==[/bold blue]\n")
-    
-    # Selecionar arquivo CSV
-    csv_path = quiet_path(
-        "Selecione o arquivo CSV para visualizar:",
-        validate=lambda path: os.path.exists(path) and path.endswith('.csv')
-    )
-    
-    if not csv_path:
-        console.print("[yellow]Operação cancelada.[/yellow]")
-        return
-    
-    # Verificar se o CSV tem cabeçalho
-    has_header = quiet_confirm("O arquivo CSV possui linha de cabeçalho?")
-    
-    # Carregar e mostrar dados
-    try:
-        df = pd.read_csv(csv_path, header=0 if has_header else None)
-        
-        # Se não há cabeçalho, atribuir um nome à coluna
-        if not has_header:
-            df.columns = ["nome"]
-        
-        # Criar tabela Rich
-        table = Table(title=f"Dados do arquivo: {os.path.basename(csv_path)}")
-        
-        # Adicionar colunas
-        for col in df.columns:
-            table.add_column(col, style="cyan")
-        
-        # Adicionar linhas (limitando a 10 registros para visualização)
-        for _, row in df.head(10).iterrows():
-            table.add_row(*[str(val) for val in row.values])
-        
-        console.print(table)
-        
-        # Informações adicionais
-        console.print(f"\n[bold]Total de registros:[/bold] {len(df)}")
-        console.print(f"[bold]Colunas disponíveis:[/bold] {', '.join(df.columns.tolist())}")
-        
-        # Verificar valores ausentes
-        missing = df.isnull().sum()
-        if missing.any():
-            console.print("\n[yellow]Aviso: O arquivo contém valores ausentes nas seguintes colunas:[/yellow]")
-            for col, count in missing[missing > 0].items():
-                console.print(f"- {col}: {count} valores ausentes")
-    
-    except Exception as e:
-        console.print(f"[bold red]Erro ao processar o arquivo:[/bold red] {str(e)}")
-    
-    console.print("\n[dim]Pressione Enter para voltar ao menu...[/dim]")
-    input()
-
-
-def test_certificate_generation():
-    """Testa a geração de um certificado único."""
-    console.clear()
-    console.print("[bold blue]== Teste de Geração de Certificado ==[/bold blue]\n")
-    
-    # Selecionar template
-    templates = template_manager.list_templates()
-    if not templates:
-        console.print("[yellow]Nenhum template disponível. Por favor, importe um template primeiro.[/yellow]")
-        input("\nPressione Enter para voltar...")
-        return
-    template_name = quiet_select(
-        "Selecione o template a ser utilizado:",
-        choices=templates,
-        style=get_menu_style()
-    )
-    
-    if not template_name:
-        console.print("[yellow]Operação cancelada.[/yellow]")
-        return
-    
-    # Carregar template
-    template_content = template_manager.load_template(template_name)
-    if not template_content:
-        console.print(f"[bold red]Erro ao carregar template:[/bold red] Arquivo não encontrado.")
-        input("\nPressione Enter para voltar...")
-        return
-    
-    # Identificar placeholders
-    placeholders = template_manager.extract_placeholders(template_content)
-    
-    if not placeholders:
-        console.print("[yellow]Aviso: Não foram encontrados placeholders no template.[/yellow]")
-        input("\nPressione Enter para voltar...")
-        return
-      # Solicitar valores para os placeholders
-    test_data = {}
-    console.print("[bold]Informe os valores para os campos:[/bold]\n")
-    
-    # Solicitar informações principais primeiro
-    nome = quiet_text("Nome do participante:")
-    evento = quiet_text("Nome do evento:")
-    data = quiet_text("Data do evento (ex: 15/05/2025):", default=datetime.now().strftime("%d/%m/%Y"))
-    local = quiet_text("Local do evento:")
-    carga_horaria = quiet_text("Carga horária (horas):")
-    
-    # Gerar código de autenticação para o teste
-    codigo_autenticacao = auth_manager.gerar_codigo_autenticacao(
-        nome_participante=nome,
-        evento=evento,
-        data_evento=data
-    )
-    codigo_verificacao = auth_manager.gerar_codigo_verificacao(codigo_autenticacao)
-    qrcode_url = auth_manager.gerar_qrcode_data(codigo_autenticacao)
-    
-    # Salvar informações do certificado de teste
-    auth_manager.salvar_codigo(
-        codigo_autenticacao=codigo_autenticacao,
-        nome_participante=nome,
-        evento=evento,
-        data_evento=data,
-        local_evento=local,
-        carga_horaria=carga_horaria
-    )
-    
-    # Adicionar valores principais e códigos ao dicionário de dados
-    test_data["nome"] = nome
-    test_data["evento"] = evento
-    test_data["data"] = data
-    test_data["local"] = local
-    test_data["carga_horaria"] = carga_horaria
-    test_data["codigo_autenticacao"] = codigo_autenticacao
-    test_data["codigo_verificacao"] = codigo_verificacao
-    test_data["url_verificacao"] = qrcode_url
-    test_data["data_emissao"] = datetime.now().strftime("%d/%m/%Y")
-    
-    # Solicitar valores para os demais placeholders que não foram preenchidos
-    outros_placeholders = [p for p in placeholders if p not in test_data]
-    for placeholder in outros_placeholders:
-        value = quiet_text(f"Valor para '{placeholder}':")
-        test_data[placeholder] = value
-    
-    # Gerar PDF de teste
-    output_path = os.path.join(pdf_generator.output_dir, "certificado_teste.pdf")
-    
-    try:
-        with console.status("[bold green]Gerando certificado de teste..."):
-            # Gerar HTML com os valores substituídos usando o template_manager
-            temp_name = f"temp_test_{random.randint(1000, 9999)}.html"
-            temp_path = os.path.join("templates", temp_name)
-            
-            try:
-                # Salvar template temporário
-                with open(temp_path, "w", encoding="utf-8") as f:
-                    f.write(template_content)
-                
-                # Renderizar o template com os dados
-                html_content = template_manager.render_template(temp_name, test_data)
-                  # Gerar PDF
-                pdf_generator.generate_pdf(html_content, output_path, orientation='landscape')
-            finally:
-                # Limpar arquivo temporário
-                if os.path.exists(temp_path):
-                    os.remove(temp_path)
-        
-        console.print(f"[bold green]✓ Certificado de teste gerado com sucesso![/bold green]")
-        console.print(f"[bold]Caminho:[/bold] {output_path}")
-        
-        # Oferecer opção para abrir o PDF
-        open_option = quiet_confirm("Deseja abrir o certificado gerado?")
-        
-        if open_option:
-            import subprocess
-            try:
-                os.startfile(output_path)  # Windows
-            except AttributeError:
-                try:
-                    subprocess.call(["open", output_path])  # macOS
-                except:
-                    subprocess.call(["xdg-open", output_path])  # Linux
-    
-    except Exception as e:
-        console.print(f"[bold red]Erro ao gerar certificado de teste:[/bold red] {str(e)}")
-    
-    console.print("\n[dim]Pressione Enter para voltar ao menu...[/dim]")
-    input()
 
 
 # Funções de implementação para o menu de templates
@@ -1140,7 +489,7 @@ def preview_template():
             example_data[placeholder] = f"Exemplo de {placeholder}"
         
         # Gerar PDF de prévia
-        preview_path = os.path.join(pdf_generator.output_dir, "preview_template.pdf")
+        preview_path = os.path.join(certificate_service.output_dir, "preview_template.pdf") # Use service's output_dir
         
         try:
             with console.status("[bold green]Gerando prévia em PDF..."):
@@ -1189,13 +538,13 @@ def preview_template():
 
 def configure_directories():
     """Configura os diretórios de trabalho."""
-    console.print("[yellow]Função ainda não implementada.[/yellow]")
+    console.print("[yellow]Esta funcionalidade está planejada para uma futura atualização. Obrigado pela sua compreensão.[/yellow]")
     input("\nPressione Enter para voltar...")
 
 
 def configure_appearance():
     """Configura aparência e tema."""
-    console.print("[yellow]Função ainda não implementada.[/yellow]")
+    console.print("[yellow]Esta funcionalidade está planejada para uma futura atualização. Obrigado pela sua compreensão.[/yellow]")
     input("\nPressione Enter para voltar...")
 
 
@@ -1300,87 +649,35 @@ def configure_institutional_placeholders():
 def configure_default_placeholders():
     """Configura valores padrão."""
     # Implementação básica
-    console.print("[yellow]Função ainda não implementada completamente.[/yellow]")
+    console.print("[yellow]Esta funcionalidade está planejada para uma futura atualização. Obrigado pela sua compreensão.[/yellow]")
     input("\nPressione Enter para voltar...")
 
 
 def configure_theme_placeholders():
     """Configura valores para temas."""
     # Implementação básica
-    console.print("[yellow]Função ainda não implementada completamente.[/yellow]")
+    console.print("[yellow]Esta funcionalidade está planejada para uma futura atualização. Obrigado pela sua compreensão.[/yellow]")
     input("\nPressione Enter para voltar...")
-
 
 def manage_presets():
     """Gerencia presets de configuração."""
-    console.print("[yellow]Função ainda não implementada.[/yellow]")
+    console.print("[yellow]Esta funcionalidade está planejada para uma futura atualização. Obrigado pela sua compreensão.[/yellow]")
     input("\nPressione Enter para voltar...")
-
-
-def check_connection():
-    """Verifica o status da conexão."""
-    console.clear()
-    console.print("[bold blue]== Status da Conexão ==[/bold blue]\n")
-    
-    with console.status("[bold green]Verificando conexão com o servidor..."):
-        result = connectivity_manager.check_connection()
-    
-    status_color = {
-        "Conectado": "green",
-        "Desconectado": "red",
-        "Aguardando": "yellow"
-    }.get(result["status"], "yellow")
-    
-    # Criar textos formatados do Rich para evitar que as tags apareçam
-    console.print(Text.from_markup(f"[bold]Status:[/bold] "), end="")
-    console.print(Text(result["status"], style=status_color))
-    
-    console.print(Text.from_markup(f"[bold]Mensagem:[/bold] {result['message']}"))
-    console.print(Text.from_markup(f"[bold]Horário:[/bold] {result['timestamp']}"))
-    
-    if "server_url" in connectivity_manager.config and connectivity_manager.config["server_url"]:
-        console.print(Text.from_markup(f"[bold]URL do servidor:[/bold] {connectivity_manager.config['server_url']}"))
-    else:
-        console.print(Text("Servidor não configurado.", style="yellow"))
-    
-    console.print("\n[dim]Pressione Enter para voltar ao menu...[/dim]")
-    input()
-
-
-def configure_remote_server():
-    """Configura servidor remoto."""
-    # Implementação básica
-    console.print("[yellow]Função ainda não implementada completamente.[/yellow]")
-    input("\nPressione Enter para voltar...")
-
-
-def upload_certificates():
-    """Envia certificados para o servidor remoto."""
-    # Implementação básica
-    console.print("[yellow]Função ainda não implementada completamente.[/yellow]")
-    input("\nPressione Enter para voltar...")
-
-
-def download_templates():
-    """Baixa templates do servidor remoto."""
-    # Implementação básica
-    console.print("[yellow]Função ainda não implementada completamente.[/yellow]")
-    input("\nPressione Enter para voltar...")
-
-
-def configure_credentials():
-    """Configura credenciais de acesso ao servidor."""
-    # Implementação básica
-    console.print("[yellow]Função ainda não implementada completamente.[/yellow]")
-    input("\nPressione Enter para voltar...")
-
 
 # Função principal do aplicativo
 def main():
     """Função principal que inicializa o aplicativo."""
+    # Exibe a tela de carregamento antes de iniciar
+    try:
+        from app.loading_screen import loading_dummy
+        loading_dummy(4.0)  # Exibir por 4 segundos (só será exibido uma vez)
+    except ImportError:
+        # Se não conseguir importar a tela de carregamento, continua normalmente
+        console.print("[yellow]Aviso: Módulo de carregamento não encontrado.[/yellow]")
+    
+    # Continuar com o menu principal após o carregamento
     while main_menu():
         pass
-
 
 # Ponto de entrada do script
 if __name__ == "__main__":
@@ -1391,236 +688,6 @@ if __name__ == "__main__":
     except Exception as e:
         console.print(f"\n[bold red]Erro inesperado:[/bold red] {str(e)}")
 
-def debug_compare_themes():
-    """Ferramenta de debug para comparar temas usando dados de exemplo."""
-    console.clear()
-    console.print("[bold blue]== DEBUG: Comparação de Temas ==[/bold blue]\n")
-    console.print("[yellow]Esta ferramenta gera certificados com TODOS os temas disponíveis usando dados de exemplo.[/yellow]")
-    console.print("[yellow]Útil para debug e comparação visual dos temas.[/yellow]\n")
-    
-    # Listar templates disponíveis
-    templates = template_manager.list_templates()
-    
-    if not templates:
-        console.print("[red]❌ Nenhum template disponível.[/red]")
-        console.print("Importe um template primeiro antes de usar esta ferramenta.")
-        input("\nPressione Enter para voltar...")
-        return
-    
-    # Selecionar template
-    template_name = quiet_select(
-        "Selecione o template para usar:",
-        choices=templates,
-        style=get_menu_style()
-    )
-    
-    if not template_name:
-        console.print("[yellow]Operação cancelada.[/yellow]")
-        return
-    
-    # Carregar template
-    template_content = template_manager.load_template(template_name)
-    if not template_content:
-        console.print(f"[red]❌ Erro ao carregar template: {template_name}[/red]")
-        return
-      # Gerar código de autenticação para exemplos de temas
-    nome_exemplo = "João da Silva Santos"
-    evento_exemplo = "Workshop de Tecnologia e Inovação"
-    data_exemplo = "15 a 17 de maio de 2025"
-    
-    # Gerar código de autenticação para o exemplo
-    codigo_autenticacao_exemplo = auth_manager.gerar_codigo_autenticacao(
-        nome_participante=nome_exemplo,
-        evento=evento_exemplo,
-        data_evento=data_exemplo
-    )
-    codigo_verificacao_exemplo = auth_manager.gerar_codigo_verificacao(codigo_autenticacao_exemplo)
-    qrcode_url_exemplo = auth_manager.gerar_qrcode_data(codigo_autenticacao_exemplo)
-    
-    # Dados de exemplo fixos para todos os certificados
-    sample_data = {
-        "nome": nome_exemplo,
-        "evento": evento_exemplo,
-        "local": "Campus Universitário - Sala de Conferências",
-        "data": data_exemplo,
-        "carga_horaria": "20",
-        "coordenador": "Prof. Dr. Maria Fernanda Costa",
-        "diretor": "Prof. Dr. Roberto Andrade Lima",
-        "cidade": "Florianópolis",
-        "data_emissao": "29 de maio de 2025",
-        "codigo_autenticacao": codigo_autenticacao_exemplo,
-        "codigo_verificacao": codigo_verificacao_exemplo,
-        "url_verificacao": qrcode_url_exemplo,
-        "intro_text": "Certificamos que",
-        "participation_text": "participou com êxito do",
-        "location_text": "realizado em",
-        "date_text": "no período de",
-        "workload_text": "com carga horária total de",
-        "hours_text": "horas",
-        "coordinator_title": "Coordenador do Evento",
-        "director_title": "Diretor da Instituição",
-        "title_text": "CERTIFICADO DE PARTICIPAÇÃO"
-    }
-    
-    # Salvar informações do certificado de exemplo
-    auth_manager.salvar_codigo(
-        codigo_autenticacao=codigo_autenticacao_exemplo,
-        nome_participante=nome_exemplo,
-        evento=evento_exemplo,
-        data_evento=data_exemplo,
-        local_evento=sample_data["local"],
-        carga_horaria=sample_data["carga_horaria"]
-    )
-    
-    # Listar temas disponíveis
-    available_themes = theme_manager.list_themes()
-    
-    if not available_themes:
-        console.print("[red]❌ Nenhum tema disponível.[/red]")
-        input("\nPressione Enter para voltar...")
-        return
-    
-    console.print(f"\n[green]✓ Template carregado: {template_name}[/green]")
-    console.print(f"[green]✓ Temas encontrados: {len(available_themes)}[/green]")
-    console.print(f"[cyan]Temas: {', '.join(available_themes)}[/cyan]\n")
-    
-    # Confirmar geração
-    confirm = quiet_confirm(
-        f"Deseja gerar {len(available_themes)} certificados (um para cada tema)?",
-        default=True
-    )
-    
-    if not confirm:
-        console.print("[yellow]Operação cancelada.[/yellow]")
-        return
-    
-    # Criar diretório de saída específico para debug
-    from datetime import datetime
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    debug_output_dir = os.path.join("output", f"debug_themes_{timestamp}")
-    os.makedirs(debug_output_dir, exist_ok=True)
-    
-    console.print(f"\n[blue]📁 Diretório de saída: {debug_output_dir}[/blue]\n")
-    
-    # Gerar certificados para cada tema
-    generated_files = []
-    
-    with console.status("[bold green]Gerando certificados com diferentes temas...") as status:
-        for i, theme_name in enumerate(available_themes, 1):
-            try:
-                status.update(f"[bold green]Processando tema {i}/{len(available_themes)}: {theme_name}")
-                
-                # Carregar configurações do tema
-                theme_settings = theme_manager.load_theme(theme_name)
-                
-                if not theme_settings:
-                    console.print(f"[yellow]⚠️ Aviso: Tema '{theme_name}' não pôde ser carregado[/yellow]")
-                    continue
-                
-                # Mesclar dados de exemplo com configurações do tema
-                merged_data = parameter_manager.merge_placeholders(sample_data.copy(), theme_name)
-                
-                # Renderizar template com dados
-                try:
-                    # Salvar template temporariamente
-                    temp_template_name = f"temp_debug_{theme_name.replace(' ', '_').lower()}_{timestamp}.html"
-                    temp_template_path = os.path.join("templates", temp_template_name)
-                    
-                    with open(temp_template_path, "w", encoding="utf-8") as f:
-                        f.write(template_content)
-                    
-                    # Renderizar template
-                    html_content = template_manager.render_template(temp_template_name, merged_data)
-                    
-                    # Aplicar tema ao HTML
-                    if theme_settings:
-                        html_content = theme_manager.apply_theme_to_template(html_content, theme_settings)
-                    
-                    # Gerar nome do arquivo
-                    safe_theme_name = theme_name.replace(" ", "_").replace("ã", "a").replace("é", "e").replace("ô", "o")
-                    pdf_filename = f"certificado_tema_{safe_theme_name}.pdf"
-                    pdf_path = os.path.join(debug_output_dir, pdf_filename)
-                    
-                    # Gerar PDF
-                    pdf_generator.generate_pdf(html_content, pdf_path, orientation='landscape')
-                    generated_files.append((pdf_path, theme_name))
-                    
-                    console.print(f"[green]✓[/green] {theme_name} → {pdf_filename}")
-                    
-                except Exception as e:
-                    console.print(f"[red]❌ Erro no tema '{theme_name}': {str(e)}[/red]")
-                    
-                finally:
-                    # Limpar arquivo temporário
-                    if 'temp_template_path' in locals() and os.path.exists(temp_template_path):
-                        os.remove(temp_template_path)
-                        
-            except Exception as e:
-                console.print(f"[red]❌ Erro geral no tema '{theme_name}': {str(e)}[/red]")
-    
-    # Relatório final
-    console.print(f"\n[bold green]🎉 Geração concluída![/bold green]")
-    console.print(f"[green]✓ {len(generated_files)} certificados gerados com sucesso[/green]")
-    console.print(f"[green]✓ Arquivos salvos em: {debug_output_dir}[/green]\n")
-    
-    if generated_files:
-        # Mostrar lista dos arquivos gerados
-        console.print("[bold]Arquivos gerados:[/bold]")
-        for pdf_path, theme_name in generated_files:
-            filename = os.path.basename(pdf_path)
-            console.print(f"  • [cyan]{filename}[/cyan] ({theme_name})")
-        
-        # Oferecer opções adicionais
-        console.print("\n[bold]Opções adicionais:[/bold]")
-        
-        action = quiet_select(
-            "O que deseja fazer agora?",
-            choices=[
-                "📁 Abrir diretório de saída",
-                "📊 Criar arquivo ZIP com todos os certificados",
-                "👁️ Abrir primeiro certificado",
-                "↩️ Voltar ao menu"
-            ],
-            style=get_menu_style()
-        )
-        
-        if action == "📁 Abrir diretório de saída":
-            try:
-                import subprocess
-                os.startfile(debug_output_dir)  # Windows
-            except AttributeError:
-                try:
-                    subprocess.call(["open", debug_output_dir])  # macOS
-                except:
-                    subprocess.call(["xdg-open", debug_output_dir])  # Linux
-            console.print("[green]✓ Diretório aberto[/green]")
-            
-        elif action == "📊 Criar arquivo ZIP com todos os certificados":
-            zip_filename = f"debug_temas_{timestamp}.zip"
-            zip_path = os.path.join(debug_output_dir, zip_filename)
-            
-            try:
-                with console.status("[bold green]Criando arquivo ZIP..."):
-                    zip_exporter.create_zip([pdf_path for pdf_path, _ in generated_files], zip_path)
-                console.print(f"[green]✓ ZIP criado: {zip_filename}[/green]")
-            except Exception as e:
-                console.print(f"[red]❌ Erro ao criar ZIP: {str(e)}[/red]")
-                
-        elif action == "👁️ Abrir primeiro certificado":
-            if generated_files:
-                first_pdf = generated_files[0][0]
-                try:
-                    import subprocess
-                    os.startfile(first_pdf)  # Windows
-                except AttributeError:
-                    try:
-                        subprocess.call(["open", first_pdf])  # macOS
-                    except:
-                        subprocess.call(["xdg-open", first_pdf])  # Linux
-                console.print("[green]✓ Certificado aberto[/green]")
-    
-    console.print("\n[dim]Pressione Enter para voltar ao menu...[/dim]")
-    input()
 
 def verify_authentication_code():
     """Verifica a autenticidade de um código de certificado."""
@@ -1695,3 +762,247 @@ def verify_authentication_code():
     
     console.print("\n[dim]Pressione Enter para voltar ao menu...[/dim]")
     input()
+
+
+def get_menu_style():
+    """Retorna o estilo padrão para menus do questionary."""
+    from questionary import Style
+    
+    return Style([
+        ('qmark', 'fg:#ff9d00 bold'),
+        ('question', 'bold'),
+        ('answer', 'fg:#ff9d00 bold'),
+        ('pointer', 'fg:#ff9d00 bold'),
+        ('highlighted', 'fg:#ff9d00 bold'),
+        ('selected', 'fg:#cc5454'),
+        ('separator', 'fg:#cc5454'),
+        ('instruction', ''),
+        ('text', ''),
+        ('disabled', 'fg:#858585 italic')
+    ])
+
+
+def settings_menu():
+    """Menu de configurações."""
+    console.clear()
+    console.print("[bold blue]== Configurações ==[/bold blue]\n")
+    
+    choice = quiet_select(
+        "O que você deseja configurar?",
+        choices=[
+            "📁 Diretórios de trabalho",
+            "🎨 Aparência e tema",
+            "📊 Parâmetros de geração",
+            "🔧 Configurações do sistema",
+            "💾 Salvar/carregar presets",
+            "↩️ Voltar ao menu principal"
+        ],
+        style=get_menu_style()
+    )
+    
+    if choice == "📁 Diretórios de trabalho":
+        configure_directories()
+    elif choice == "🎨 Aparência e tema":
+        configure_appearance()
+    elif choice == "📊 Parâmetros de geração":
+        configure_generation_parameters()
+    elif choice == "🔧 Configurações do sistema":
+        configure_system_settings()
+    elif choice == "💾 Salvar/carregar presets":
+        manage_presets()
+    elif choice == "↩️ Voltar ao menu principal":
+        return
+
+
+def configure_system_settings():
+    """Configurações gerais do sistema."""
+    console.clear()
+    console.print("[bold blue]== Configurações do Sistema ==[/bold blue]\n")
+    
+    # Verificar status atual do modo debug
+    debug_mode = parameter_manager.get_debug_mode()
+    debug_status = "[green]ATIVADO[/green]" if debug_mode else "[red]DESATIVADO[/red]"
+    
+    console.print(f"[bold]Status atual do modo DEBUG:[/bold] {debug_status}\n")
+    console.print("[dim]O modo DEBUG exibe opções e informações adicionais para desenvolvedores e diagnóstico.[/dim]")
+    console.print("[dim]Ativar este modo pode expor informações técnicas e funções experimentais.[/dim]\n")
+    
+    # Opções disponíveis para configurações do sistema
+    choice = quiet_select(
+        "O que você deseja configurar?",
+        choices=[
+            f"{'Desativar' if debug_mode else 'Ativar'} modo DEBUG",
+            "↩️ Voltar"
+        ],
+        style=get_menu_style()
+    )
+    
+    if choice == "Ativar modo DEBUG" or choice == "Desativar modo DEBUG":
+        new_status = not debug_mode
+        confirm_msg = "Tem certeza que deseja ATIVAR o modo DEBUG?" if new_status else "Tem certeza que deseja DESATIVAR o modo DEBUG?"
+        
+        confirm = quiet_confirm(confirm_msg)
+        if confirm:
+            result = parameter_manager.set_debug_mode(new_status)
+            if result:
+                status_msg = "[green]✓ Modo DEBUG ATIVADO com sucesso![/green]" if new_status else "[yellow]✓ Modo DEBUG DESATIVADO![/yellow]"
+                console.print(status_msg)
+                console.print("[dim]Esta configuração será mantida entre sessões do programa.[/dim]")
+                
+                if new_status:
+                    console.print("\n[yellow]Atenção: Funções de DEBUG agora estão visíveis no menu principal.[/yellow]")
+                    console.print("[yellow]Estas incluem:[/yellow]")
+                    console.print("[dim]  • DEBUG: Comparar temas[/dim]")
+                    console.print("[dim]  • DEBUG: Verificar sistema[/dim]")
+            else:
+                console.print("[bold red]Erro ao salvar configuração![/bold red]")
+        
+        # Mostrar novamente o menu de configurações do sistema
+        console.print("\n[dim]Pressione Enter para continuar...[/dim]")
+        input()
+        configure_system_settings()
+    
+    elif choice == "↩️ Voltar":
+        settings_menu()
+
+
+def manage_templates_menu():
+    """Menu para gerenciamento de templates."""
+    console.clear()
+    console.print("[bold blue]== Gerenciamento de Templates ==[/bold blue]\n")
+    
+    choice = quiet_select(
+        "O que você deseja fazer?",
+        choices=[
+            "📄 Listar templates",
+            "📥 Importar template",
+            "✏️ Editar template",
+            "🗑️ Excluir template",
+            "👁️ Visualizar template",
+            "🧪 Testar geração de certificado",
+            "📊 Visualizar dados CSV",
+            "↩️ Voltar ao menu principal"
+        ],
+        style=get_menu_style()
+    )
+    
+    if choice == "📄 Listar templates":
+        list_templates()
+    elif choice == "📥 Importar template":
+        import_template()
+    elif choice == "✏️ Editar template":
+        edit_template()
+    elif choice == "🗑️ Excluir template":
+        delete_template()
+    elif choice == "👁️ Visualizar template":
+        preview_template()
+    elif choice == "🧪 Testar geração de certificado":
+        generate_certificate_single()
+    elif choice == "📊 Visualizar dados CSV":
+        preview_imported_data()
+    elif choice == "↩️ Voltar ao menu principal":
+        return
+    
+    # Retornar ao menu de templates após cada operação
+    manage_templates_menu()
+
+
+def show_help():
+    """Exibe a ajuda do sistema."""
+    console.clear()
+    console.print("[bold blue]== Ajuda do NEPEM Cert ==[/bold blue]\n")
+    
+    help_content = """
+[bold]NEPEM Cert - Gerador de Certificados em Lote[/bold]
+
+[bold cyan]Funcionalidades Principais:[/bold cyan]
+• [green]Geração de Certificados:[/green] Crie certificados em lote a partir de templates HTML e dados CSV
+• [green]Gerenciamento de Templates:[/green] Importe, edite e gerencie templates de certificados
+• [green]Temas Personalizados:[/green] Aplique diferentes estilos visuais aos seus certificados
+• [green]Configurações Flexíveis:[/green] Configure valores padrão, institucionais e específicos por tema
+
+[bold cyan]Como Usar:[/bold cyan]
+1. [yellow]Prepare seu arquivo CSV[/yellow] com uma coluna contendo os nomes dos participantes
+2. [yellow]Importe um template HTML[/yellow] ou use um dos templates existentes
+3. [yellow]Configure os parâmetros[/yellow] institucionais e valores padrão
+4. [yellow]Gere os certificados[/yellow] informando os dados do evento
+
+[bold cyan]Formatos Suportados:[/bold cyan]
+• [green]Templates:[/green] Arquivos HTML com placeholders no formato {{ placeholder }}
+• [green]Dados:[/green] Arquivos CSV com encoding UTF-8
+• [green]Saída:[/green] Certificados em PDF e opcionalmente empacotados em ZIP
+
+[bold cyan]Placeholders Disponíveis:[/bold cyan]
+• {{ nome }} - Nome do participante
+• {{ evento }} - Nome do evento
+• {{ data }} - Data do evento
+• {{ local }} - Local do evento
+• {{ carga_horaria }} - Carga horária do evento
+• {{ codigo_autenticacao }} - Código único de autenticação
+• {{ codigo_verificacao }} - Código de verificação
+• {{ data_emissao }} - Data de emissão do certificado
+
+[bold cyan]Dicas Importantes:[/bold cyan]
+• Use encoding UTF-8 nos arquivos CSV para evitar problemas com acentos
+• Templates HTML devem ser compatíveis com a biblioteca de geração de PDF
+• Evite elementos CSS complexos como flexbox ou posicionamento absoluto
+• Configure valores institucionais para reutilizar informações comuns
+
+[bold [bold cyan]Suporte:[/bold cyan]
+• Versão atual: v1.1.0
+• Para problemas técnicos, ative o modo DEBUG nas configurações
+• Templates de exemplo estão disponíveis na pasta 'templates'
+"""
+    
+    console.print(help_content)
+    
+    input("\n[dim]Pressione Enter para voltar ao menu principal...[/dim]")
+    """Exibe a ajuda do sistema."""
+    console.clear()
+    console.print("[bold blue]== Ajuda do NEPEM Cert ==[/bold blue]\n")
+    
+    help_content = """
+[bold]NEPEM Cert - Gerador de Certificados em Lote[/bold]
+
+[bold cyan]Funcionalidades Principais:[/bold cyan]
+• [green]Geração de Certificados:[/green] Crie certificados em lote a partir de templates HTML e dados CSV
+• [green]Gerenciamento de Templates:[/green] Importe, edite e gerencie templates de certificados
+• [green]Temas Personalizados:[/green] Aplique diferentes estilos visuais aos seus certificados
+• [green]Configurações Flexíveis:[/green] Configure valores padrão, institucionais e específicos por tema
+
+[bold cyan]Como Usar:[/bold cyan]
+1. [yellow]Prepare seu arquivo CSV[/yellow] com uma coluna contendo os nomes dos participantes
+2. [yellow]Importe um template HTML[/yellow] ou use um dos templates existentes
+3. [yellow]Configure os parâmetros[/yellow] institucionais e valores padrão
+4. [yellow]Gere os certificados[/yellow] informando os dados do evento
+
+[bold cyan]Formatos Suportados:[/bold cyan]
+• [green]Templates:[/green] Arquivos HTML com placeholders no formato {{ placeholder }}
+• [green]Dados:[/green] Arquivos CSV com encoding UTF-8
+• [green]Saída:[/green] Certificados em PDF e opcionalmente empacotados em ZIP
+
+[bold cyan]Placeholders Disponíveis:[/bold cyan]
+• {{ nome }} - Nome do participante
+• {{ evento }} - Nome do evento
+• {{ data }} - Data do evento
+• {{ local }} - Local do evento
+• {{ carga_horaria }} - Carga horária do evento
+• {{ codigo_autenticacao }} - Código único de autenticação
+• {{ codigo_verificacao }} - Código de verificação
+• {{ data_emissao }} - Data de emissão do certificado
+
+[bold cyan]Dicas Importantes:[/bold cyan]
+• Use encoding UTF-8 nos arquivos CSV para evitar problemas com acentos
+• Templates HTML devem ser compatíveis com a biblioteca de geração de PDF
+• Evite elementos CSS complexos como flexbox ou posicionamento absoluto
+• Configure valores institucionais para reutilizar informações comuns
+
+[bold [bold cyan]Suporte:[/bold cyan]
+• Versão atual: v1.1.0
+• Para problemas técnicos, ative o modo DEBUG nas configurações
+• Templates de exemplo estão disponíveis na pasta 'templates'
+"""
+    
+    console.print(help_content)
+    
+    input("\n[dim]Pressione Enter para voltar ao menu principal...[/dim]")

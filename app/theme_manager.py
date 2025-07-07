@@ -7,13 +7,13 @@ também são definidos no módulo themes.py.
 """
 import os
 import json
-import re
+import re # Still needed by other methods like slugify if it were here, or by users of the class
 import base64
 from slugify import slugify
 
 # Importar temas pré-definidos do módulo themes.py
 from app.themes import PREDEFINED_THEMES
-
+from app.utils.app_utils import load_json_with_comments
 class ThemeManager:
     def __init__(self, themes_dir="themes"):
         """
@@ -27,14 +27,19 @@ class ThemeManager:
         
         # Carregar temas pré-definidos do módulo themes.py
         self.predefined_themes = PREDEFINED_THEMES
-        
-        # Mapeamento de nomes de tema para arquivos
+          # Mapeamento de nomes de tema para arquivos
         self.theme_files = {
             "Acadêmico Clássico": "academico_classico.json",
             "Executivo Premium": "executivo_premium.json", 
             "Contemporâneo Elegante": "contemporaneo_elegante.json",
             "Diplomático Oficial": "diplomatico_oficial.json",
-            "Minimalista Moderno": "minimalista_moderno.json"
+            "Minimalista Moderno": "minimalista_moderno.json",
+            "Executivo Distincao": "executivo_distincao.json",
+            "Linhaca Contemporaneo": "linhaca_contemporaneo.json",
+            "Linhaca Contemporaneo Contribuição": "linhaca_contemporaneo_contribuição.json",
+            "Minimalista Neutro": "minimalista_neutro.json",
+            "Moderno Tecnológico": "moderno_tecnológico.json",
+            "Tradicional Solene": "tradicional_solene.json"
         }
         
         # Verificar se todos os temas pré-definidos têm arquivos correspondentes
@@ -76,8 +81,7 @@ class ThemeManager:
                             
                         # Transformar nome do arquivo em nome legível
                         theme_name = os.path.splitext(filename)[0].replace('_', ' ').title()
-                        
-                        # Mapear nomes conhecidos para seus nomes oficiais
+                          # Mapear nomes conhecidos para seus nomes oficiais
                         # Ex: "academico_classico.json" para "Acadêmico Clássico"
                         for official_name, file_name in self.theme_files.items():
                             if file_name == filename:
@@ -85,6 +89,22 @@ class ThemeManager:
                                 break
                                 
                         all_themes[theme_name] = theme_data
+                    except json.JSONDecodeError:
+                        # Tentar novamente com a função que suporta comentários
+                        try:
+                            theme_path = os.path.join(self.themes_dir, filename)
+                            theme_data = load_json_with_comments(theme_path)
+                            
+                            # Mapear nomes conhecidos para seus nomes oficiais
+                            theme_name = os.path.splitext(filename)[0].replace('_', ' ').title()
+                            for official_name, file_name in self.theme_files.items():
+                                if file_name == filename:
+                                    theme_name = official_name
+                                    break
+                                    
+                            all_themes[theme_name] = theme_data
+                        except Exception as e:
+                            print(f"Erro ao carregar tema {filename}: {e}")
                     except Exception as e:
                         print(f"Erro ao carregar tema {filename}: {e}")
         
@@ -126,8 +146,7 @@ class ThemeManager:
             
         Returns:
             dict: Configurações do tema ou None se o tema não existir
-        """
-        # Determinar o nome do arquivo
+        """        # Determinar o nome do arquivo
         if name in self.theme_files:
             file_name = self.theme_files[name]
         else:
@@ -137,8 +156,15 @@ class ThemeManager:
         
         # Carregar do arquivo
         if os.path.exists(theme_path):
-            with open(theme_path, "r", encoding="utf-8") as f:
-                return json.load(f)
+            try:
+                with open(theme_path, "r", encoding="utf-8") as f:
+                    return json.load(f)
+            except json.JSONDecodeError:
+                # Tentar novamente com a função que suporta comentários
+                try:
+                    return load_json_with_comments(theme_path)
+                except Exception:
+                    return None
                 
         # Se não encontrou um arquivo, verificar nos temas pré-definidos
         if name in self.predefined_themes:
@@ -198,139 +224,216 @@ class ThemeManager:
             return True
         
         return False    
+
+    def _map_font_to_safe(self, font_family):
+        """
+        Mapeia famílias de fontes para versões web-safe compatíveis com PDF.
+        
+        Args:
+            font_family (str): Família de fonte original
+            
+        Returns:
+            str: Família de fonte mapeada para versão web-safe
+        """
+        # Dicionário de mapeamento de fontes para versões web-safe
+        safe_fonts = {
+            # Fontes serifadas
+            'Times New Roman': 'Times, serif',
+            'Times': 'Times, serif',
+            'Georgia': 'Georgia, serif',
+            'Garamond': 'Georgia, serif',
+            'Book Antiqua': 'Georgia, serif',
+            
+            # Fontes sans-serif
+            'Arial': 'Arial, sans-serif',
+            'Helvetica': 'Helvetica, Arial, sans-serif',
+            'Helvetica Neue': 'Helvetica, Arial, sans-serif',
+            'Verdana': 'Verdana, sans-serif',
+            'Tahoma': 'Verdana, sans-serif',
+            'Trebuchet MS': 'Verdana, sans-serif',
+            'Calibri': 'Arial, sans-serif',
+            'Segoe UI': 'Arial, sans-serif',
+            'Roboto': 'Arial, sans-serif',
+            'Open Sans': 'Arial, sans-serif',
+            'Lato': 'Arial, sans-serif',
+            'Montserrat': 'Helvetica, Arial, sans-serif',
+            'Source Sans Pro': 'Arial, sans-serif',
+            'Ubuntu': 'Arial, sans-serif',
+            'Nunito': 'Arial, sans-serif',
+            'PT Sans': 'Arial, sans-serif',
+            'Poppins': 'Arial, sans-serif',
+            'Inter': 'Arial, sans-serif',
+            
+            # Fontes monoespaçadas
+            'Courier New': 'Courier, monospace',
+            'Courier': 'Courier, monospace',
+            'Monaco': 'Courier, monospace',
+            'Consolas': 'Courier, monospace',
+            'Source Code Pro': 'Courier, monospace',
+            
+            # Fontes decorativas/especiais
+            'Impact': 'Arial Black, sans-serif',
+            'Arial Black': 'Arial Black, sans-serif',
+            'Comic Sans MS': 'Arial, sans-serif',
+            'Brush Script MT': 'cursive',
+            'Lucida Handwriting': 'cursive'
+        }
+        
+        # Limpar a string da fonte (remover espaços extras, etc.)
+        font_family = font_family.strip()
+        
+        # Se já contém fallbacks (vírgulas), usar como está
+        if ',' in font_family:
+            return font_family
+        
+        # Procurar mapeamento direto
+        if font_family in safe_fonts:
+            return safe_fonts[font_family]
+        
+        # Procurar mapeamento parcial (case-insensitive)
+        font_lower = font_family.lower()
+        for font_key, font_value in safe_fonts.items():
+            if font_key.lower() in font_lower or font_lower in font_key.lower():
+                return font_value
+        
+        # Se não encontrar mapeamento, determinar categoria baseada em palavras-chave
+        font_lower = font_family.lower()
+        
+        # Verificar se é serif
+        serif_keywords = ['serif', 'times', 'roman', 'garamond', 'georgia', 'book']
+        if any(keyword in font_lower for keyword in serif_keywords):
+            return f"{font_family}, serif"
+        
+        # Verificar se é monospace
+        mono_keywords = ['mono', 'courier', 'code', 'console', 'terminal']
+        if any(keyword in font_lower for keyword in mono_keywords):
+            return f"{font_family}, monospace"
+        
+        # Verificar se é cursive/script
+        script_keywords = ['script', 'handwriting', 'cursive', 'brush']
+        if any(keyword in font_lower for keyword in script_keywords):
+            return f"{font_family}, cursive"
+        
+        # Padrão: sans-serif
+        return f"{font_family}, sans-serif"
+
     def apply_theme_to_template(self, html_content, theme_settings):
         """
-        Aplica as configurações de tema ao HTML do template de forma não-destrutiva.
-        Modifica apenas propriedades decorativas (cores, fontes, bordas) preservando a estrutura.
-        NÃO modifica tamanhos de fonte ou margens para evitar problemas de layout.
+        Aplica configurações de tema ao template HTML injetando estilos CSS.
+        
+        Args:
+            html_content (str): Conteúdo HTML do template
+            theme_settings (dict): Configurações do tema
+            
+        Returns:
+            str: HTML com tema aplicado
         """
-        # Extrair configurações do tema - apenas cores e fontes
-        font_family = theme_settings.get("font_family", "Arial, sans-serif")
-        text_color = theme_settings.get("text_color", "#333333")
-        background_color = theme_settings.get("background_color", "#ffffff")
-        border_color = theme_settings.get("border_color", "#1a5276")
-        border_width = theme_settings.get("border_width", "4px")
-        border_style = theme_settings.get("border_style", "solid")
-        name_color = theme_settings.get("name_color", "#1a4971")
-        title_color = theme_settings.get("title_color", "#1a5276")
-        signature_color = theme_settings.get("signature_color", "#333333")
-        event_name_color = theme_settings.get("event_name_color", "#1a5276")
-        link_color = theme_settings.get("link_color", "#1a5276")
-        bg_image_base64 = theme_settings.get("background_image")
+        if not theme_settings:
+            return html_content
         
-        # Garantir que apenas fontes seguras sejam usadas
-        safe_fonts = {
-            "'Crimson Text', 'Garamond', 'Times New Roman', serif": "Times, 'Times New Roman', serif",
-            "'Cormorant Garamond', 'Palatino Linotype', 'Book Antiqua', serif": "Palatino, 'Times New Roman', serif",
-            "'Montserrat', 'Helvetica Neue', Arial, sans-serif": "Helvetica, Arial, sans-serif",
-            "'Raleway', 'Roboto', 'Segoe UI', sans-serif": "Helvetica, Arial, sans-serif",
-            "'Poppins', 'Open Sans', Helvetica, sans-serif": "Helvetica, Arial, sans-serif"
-        }
-        font_family = safe_fonts.get(font_family, font_family)
+        # Construir CSS rules baseado nas configurações do tema
+        css_rules = []
         
-        # 1. Modificar fonte da família no body
-        html_content = re.sub(
-            r'(body\s*\{[^}]*?)font-family:\s*[^;]+;',
-            f'\\1font-family: {font_family};',
-            html_content,
-            flags=re.MULTILINE | re.DOTALL
-        )
+        # Font family (mapear para fontes seguras)
+        if 'font_family' in theme_settings:
+            mapped_font = self._map_font_to_safe(theme_settings['font_family'])
+            css_rules.append(f"body {{ font-family: {mapped_font} !important; }}")
         
-        # 2. Modificar cor de fundo do body
-        html_content = re.sub(
-            r'(body\s*\{[^}]*?)background-color:\s*[^;]+;',
-            f'\\1background-color: {background_color};',
-            html_content,
-            flags=re.MULTILINE | re.DOTALL
-        )
+        # Text color (aplicar a múltiplos seletores)
+        if 'text_color' in theme_settings:
+            color = theme_settings['text_color']
+            css_rules.append(f"body, .content, .text, .verification, .footer, p, div {{ color: {color} !important; }}")
         
-        # 3. Modificar borda do body
-        html_content = re.sub(
-            r'(body\s*\{[^}]*?)border:\s*[^;]+;',
-            f'\\1border: {border_width} {border_style} {border_color};',
-            html_content,
-            flags=re.MULTILINE | re.DOTALL
-        )
-          # 4. Modificar cor da fonte do título (mantendo tamanho original)
-        html_content = re.sub(
-            r'(\.title\s*\{[^}]*?)color:\s*[^;]+;',
-            f'\\1color: {title_color};',
-            html_content,
-            flags=re.MULTILINE | re.DOTALL
-        )
+        # Background color (aplicar apenas se não houver background image)
+        if 'background_color' in theme_settings and not theme_settings.get('background_image'):
+            bg_color = theme_settings['background_color']
+            css_rules.append(f"body, .certificate, .certificate-container {{ background-color: {bg_color} !important; }}")
         
-        # 5. Modificar cor da fonte do conteúdo principal (mantendo tamanho original)
-        html_content = re.sub(
-            r'(\.content\s*\{[^}]*?)color:\s*[^;]+;',
-            f'\\1color: {text_color};',
-            html_content,
-            flags=re.MULTILINE | re.DOTALL
-        )
-          # 6. Modificar nome do participante (apenas cor da fonte e da borda)
-        html_content = re.sub(
-            r'(\.participant-name\s*\{[^}]*?)color:\s*[^;]+;',
-            f'\\1color: {name_color};',
-            html_content,
-            flags=re.MULTILINE | re.DOTALL
-        )
+        # Border (aplicar a múltiplos seletores)
+        if all(key in theme_settings for key in ['border_width', 'border_style', 'border_color']):
+            border = f"{theme_settings['border_width']} {theme_settings['border_style']} {theme_settings['border_color']}"
+            css_rules.append(f"body, .certificate, .certificate-container {{ border: {border} !important; }}")
         
-        html_content = re.sub(
-            r'(\.participant-name\s*\{[^}]*?)border-bottom:\s*[^;]+;',
-            f'\\1border-bottom: 2px solid {name_color};',
-            html_content,
-            flags=re.MULTILINE | re.DOTALL
-        )
+        # Title color
+        if 'title_color' in theme_settings:
+            css_rules.append(f".title, h1 {{ color: {theme_settings['title_color']} !important; }}")
         
-        # 7. Modificar cor do nome do evento
-        html_content = re.sub(
-            r'(\.event-name\s*\{[^}]*?)color:\s*[^;]+;',
-            f'\\1color: {event_name_color};',
-            html_content,
-            flags=re.MULTILINE | re.DOTALL
-        )
+        # Name color
+        if 'name_color' in theme_settings:
+            color = theme_settings['name_color']
+            css_rules.append(f".name, .participant-name {{ color: {color} !important; border-bottom-color: {color} !important; }}")
         
-        # 8. Modificar linha das assinaturas
-        html_content = re.sub(
-            r'(\.signature-line\s*\{[^}]*?)border-top:\s*[^;]+;',
-            f'\\1border-top: 1px solid {signature_color};',
-            html_content,
-            flags=re.MULTILINE | re.DOTALL
-        )
-          # 9. Modificar cor da fonte das assinaturas (mantendo tamanho original)
-        html_content = re.sub(
-            r'(\.signature-name\s*\{[^}]*?)color:\s*[^;]+;',
-            f'\\1color: {signature_color};',
-            html_content,
-            flags=re.MULTILINE | re.DOTALL
-        )
+        # Event name color
+        if 'event_name_color' in theme_settings:
+            css_rules.append(f".event-name, .evento {{ color: {theme_settings['event_name_color']} !important; }}")
         
-        # 10. Modificar cor dos links
-        html_content = re.sub(
-            r'(\.nepemcert-link\s*\{[^}]*?)color:\s*[^;]+;',
-            f'\\1color: {link_color};',
-            html_content,
-            flags=re.MULTILINE | re.DOTALL
-        )
+        # Signature color
+        if 'signature_color' in theme_settings:
+            color = theme_settings['signature_color']
+            css_rules.append(f".signature-line {{ border-top-color: {color} !important; }}")
+            css_rules.append(f".signature-name, .assinatura p, .signature div {{ color: {color} !important; }}")
         
-        # 11. Adicionar imagem de fundo se fornecida (apenas adiciona propriedades, não muda estrutura)
-        if bg_image_base64:
-            if "background-image:" in html_content:
-                html_content = re.sub(
-                    r'(body\s*\{[^}]*?)background-image:\s*[^;]+;',
-                    f'\\1background-image: url("data:image/png;base64,{bg_image_base64}");',
-                    html_content,
-                    flags=re.MULTILINE | re.DOTALL
-                )
+        # Link color
+        if 'link_color' in theme_settings:
+            css_rules.append(f"a, .nepemcert-link {{ color: {theme_settings['link_color']} !important; }}")
+        
+        # Background image - CORRIGIDO: aplicar com data URI completo
+        if 'background_image' in theme_settings and theme_settings['background_image']:
+            base64_img = theme_settings['background_image']
+            
+            # Verificar se já inclui o prefixo data URI
+            if not base64_img.startswith('data:'):
+                # Assumir PNG por padrão se não especificado
+                image_data_uri = f"data:image/png;base64,{base64_img}"
             else:
-                # Adicionar propriedades de background após background-color
-                html_content = re.sub(
-                    r'(body\s*\{[^}]*?background-color:\s*[^;]+;)',
-                    f'\\1\n            background-image: url("data:image/png;base64,{bg_image_base64}");\n            background-size: cover;\n            background-position: center;\n            background-repeat: no-repeat;',
-                    html_content,
-                    flags=re.MULTILINE | re.DOTALL
-                )
+                image_data_uri = base64_img
+            
+            # Aplicar background image ao body com configurações otimizadas para PDF
+            css_rules.append(f"""
+                body {{
+                    background-image: url('{image_data_uri}') !important;
+                    background-size: cover !important;
+                    background-position: center center !important;
+                    background-repeat: no-repeat !important;
+                    background-attachment: fixed !important;
+                }}
+            """.strip())
+            
+            # Garantir que elementos filhos sejam transparentes para mostrar o background
+            css_rules.append(f"""
+                .certificate-container, .title, .content, .signature, .footer, #qr-code-placeholder {{
+                    background: transparent !important;
+                }}
+            """.strip())
+            
+            # Ajustar text-shadow para melhor legibilidade sobre backgrounds
+            css_rules.append(f"""
+                .title, .content, .participant-name, .event-name, .signature, .footer {{
+                    text-shadow: 1px 1px 3px rgba(255, 255, 255, 0.9), -1px -1px 3px rgba(255, 255, 255, 0.9) !important;
+                }}
+            """.strip())
         
-        return html_content
+        # Se não há regras CSS, retornar HTML original
+        if not css_rules:
+            return html_content
+        
+        # Criar o bloco de estilo CSS
+        css_block = f'''<style type="text/css" id="nepemcert-theme-styles">
+        /* Theme Styles Applied by NEPEMCERT */
+        {chr(10).join(css_rules)}
+</style>'''
+        
+        # Tentar inserir antes de </head>
+        if '</head>' in html_content:
+            return html_content.replace('</head>', f'{css_block}\n</head>')
+        
+        # Se não há </head>, tentar inserir após <body>
+        elif '<body>' in html_content:
+            return html_content.replace('<body>', f'<body>\n{css_block}')
+        
+        # Se não há nem </head> nem <body>, inserir no início
+        else:
+            return f'{css_block}\n{html_content}'
     
     def image_to_base64(self, image_file):
         """Converte uma imagem para base64"""
@@ -363,7 +466,7 @@ class ThemeManager:
         else:            # Criar do zero com valores padrão (apenas cores e fontes)
             theme_settings = {
                 "font_family": "Arial, sans-serif",
-                "heading_color": "#1a5276",
+                "heading_color": "#1a5276", # Note: heading_color is not directly used in new apply_theme
                 "text_color": "#333333",
                 "background_color": "#ffffff",
                 "border_color": "#dddddd",
@@ -373,10 +476,10 @@ class ThemeManager:
                 "title_color": "#1a5276",
                 "event_name_color": "#1a5276",
                 "link_color": "#1a5276",
-                "title_text": "Certificado",
+                "title_text": "Certificado", # These text fields are not used by apply_theme_to_template CSS generation
                 "intro_text": "Certifica-se que",
                 "participation_text": "participou do evento",
-                "footer_style": "classic",
+                "footer_style": "classic", # Not used by apply_theme_to_template CSS generation
                 "signature_color": "#333333",
                 "background_image": None
             }
@@ -417,3 +520,4 @@ class ThemeManager:
         except Exception as e:
             print(f"Erro ao carregar imagem de fundo: {e}")
             return False
+

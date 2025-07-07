@@ -58,6 +58,9 @@
         "coordenador": "Prof. Dr. Tiago Olivoto",
         "diretor": "Fulano da Silva",
         "cidade": "Florianópolis, SC",
-        "url_verificacao": "https://nepemufsc.com/verificar-certificado/"
+        "url_verificacao": "https://certificados.nepemufsc.com"
+    },
+    "system_settings": {
+        "debug_mode": true
     }
 }
