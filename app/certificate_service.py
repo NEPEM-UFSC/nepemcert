@@ -56,18 +56,35 @@ class CertificateService:
                 result["errors"].append("CSV file is empty or could not be loaded")
                 return result
                 
-            # 2. Processar cabeçalho se necessário
-            if has_header and len(df) > 0:
-                # Se tem cabeçalho, remover a primeira linha
-                df = df.iloc[1:].reset_index(drop=True)
-            
-            # 3. Validar se há dados após processamento do cabeçalho
+            # 2. O CSV já foi processado pelo CLI, então não precisamos reprocessar o cabeçalho
+            # Vamos apenas garantir que temos dados válidos
             if df.empty:
                 result["failed_count"] = -1
-                result["errors"].append("No participant data found after header processing")
+                result["errors"].append("No participant data found in CSV")
                 return result
             
-            # 4. Carregar template
+            # 3. Verificar se a primeira coluna contém os nomes
+            if len(df.columns) == 0:
+                result["failed_count"] = -1
+                result["errors"].append("CSV has no columns")
+                return result
+            
+            # 4. Garantir que estamos usando a primeira coluna como nome
+            # O CLI já processou o CSV e garantiu que a primeira coluna é 'nome'
+            if 'nome' not in df.columns:
+                # Se não tem coluna 'nome', usar a primeira coluna
+                df = df.rename(columns={df.columns[0]: 'nome'})
+            
+            # 5. Remover registros com nomes vazios
+            df = df.dropna(subset=['nome'])
+            df = df[df['nome'].str.strip() != '']
+            
+            if df.empty:
+                result["failed_count"] = -1
+                result["errors"].append("No valid participant names found in CSV")
+                return result
+            
+            # 6. Carregar template
             template_content = self.template_manager.load_template(template_name)
             if not template_content:
                 result["failed_count"] = -1
