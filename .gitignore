@@ -188,3 +188,4 @@ config/connectivity.json
 config/
 data/offline_sync.db
 config/connectivity.json
+app/__pycache__/
