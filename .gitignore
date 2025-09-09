@@ -179,6 +179,8 @@ copilot-instructions.md
 
 output/
 
+*.pyc
+
 uploads/
 
 config/parameters.json
