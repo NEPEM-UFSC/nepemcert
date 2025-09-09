@@ -9,6 +9,44 @@ from datetime import datetime
 import requests
 
 class ConnectivityManager:
+    """
+    ConnectivityManager
+    Gerencia a conectividade entre o cliente e o servidor remoto para operações de certificados e templates.
+    Atributos:
+        config_dir (str): Diretório onde o arquivo de configuração é armazenado.
+        config_file (str): Caminho para o arquivo de configuração JSON.
+        config (dict): Configurações de conectividade carregadas do arquivo.
+        session (requests.Session): Sessão HTTP para requisições ao servidor.
+    Métodos:
+        load_config():
+            Carrega as configurações de conectividade do arquivo JSON. Se o arquivo não existir ou estiver corrompido, carrega configurações padrão.
+        save_config():
+            Salva as configurações atuais no arquivo JSON.
+        _get_default_config():
+            Retorna um dicionário com as configurações padrão de conectividade.
+        check_connection():
+            Verifica a conexão com o servidor remoto realizando uma requisição ao endpoint de status. Atualiza e retorna o status da conexão.
+        set_server_url(url):
+            Define a URL do servidor remoto e salva nas configurações.
+        set_credentials(username, password):
+            Define as credenciais de acesso ao servidor (usuário e senha) e salva nas configurações.
+        set_api_key(api_key):
+            Define a chave de API para autenticação e atualiza o cabeçalho da sessão HTTP.
+        upload_certificates(file_paths):
+            Realiza o upload de arquivos de certificado para o servidor. Retorna o resultado da operação.
+        download_templates():
+            Lista os templates disponíveis no servidor. Retorna uma lista de templates e mensagem de status.
+        download_specific_template(template_name, target_dir):
+            Baixa um template específico do servidor e salva no diretório indicado. Retorna o resultado da operação.
+        get_connection_status():
+            Retorna o status atual da conexão e o horário da última verificação.
+        toggle_auto_sync(enabled=None):
+            Ativa ou desativa a sincronização automática. Se 'enabled' for None, alterna o estado atual.
+        set_sync_interval(minutes):
+            Define o intervalo (em minutos) para sincronização automática.
+    Exceções:
+        Os métodos lidam com exceções relacionadas a arquivos, requisições HTTP e decodificação JSON, retornando mensagens de erro apropriadas.
+    """
     def __init__(self, config_dir="config"):
         self.config_dir = config_dir
         self.config_file = os.path.join(config_dir, "connectivity.json")
