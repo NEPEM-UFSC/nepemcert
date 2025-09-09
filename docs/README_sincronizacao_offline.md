@@ -117,7 +117,7 @@ success = sync_manager.store_certificate(certificate_data)
 from app.auto_sync_service import AutoSyncService
 
 service = AutoSyncService(
-    server_url="https://nepemufsc.com/api",
+    server_url="https://certificados.nepemufsc/.netlify/functions/",
     check_interval=30,
     batch_size=10
 )
