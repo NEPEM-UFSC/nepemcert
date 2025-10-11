@@ -215,6 +215,7 @@ def main_menu():
     menu_options = [
         "🔖 Gerar Certificados",
         "🎨 Gerenciar Templates",
+        "🔑 Gerenciar Chaves de API",
         "⚙️ Configurações",
         "🔄 Sincronização e Conectividade",
         "❓ Ajuda",
@@ -239,6 +240,9 @@ def main_menu():
         generate_certificates_menu()
     elif choice == "🎨 Gerenciar Templates":
         manage_templates_menu()
+    elif choice == "🔑 Gerenciar Chaves de API":
+        from app.cli.cli_api_keys import api_keys_menu
+        api_keys_menu()
     elif choice == "⚙️ Configurações":
         settings_menu()
     elif choice == "🔄 Sincronização e Conectividade":

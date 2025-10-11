@@ -100,7 +100,7 @@ class ConnectivityManager:
             }
 
         server_url = self.config["server_url"]
-        status_endpoint = f"{server_url.rstrip('/')}/api/v1/status"
+        status_endpoint = f"{server_url.rstrip('/')}/.netlify/functions/health"
         timestamp = datetime.now().isoformat()
 
         try:

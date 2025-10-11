@@ -1,6 +1,7 @@
 import os
 import random
 from datetime import datetime
+from typing import Dict, List, Any, Optional  # Adicionar importações de tipos
 import pandas as pd # Ensure pandas is imported
 import jinja2 # Added for direct string template rendering
 
@@ -11,17 +12,23 @@ from .cert_auth_manager import CertAuthenticationManager
 from .parameter_manager import ParameterManager
 from .theme_manager import ThemeManager
 from .offline_sync_manager import OfflineSyncManager
+from .api_client import CertificateAPIClient  # Nova importação
 
 
 class CertificateService:
-    def __init__(self, output_dir="output"):
+    def __init__(self, output_dir="output", enable_api_sync=True, api_dev_mode=True):
         self.csv_manager = CSVManager()
         self.template_manager = TemplateManager()
         self.pdf_generator = PDFGenerator(output_dir=output_dir)
-        self.auth_manager =CertAuthenticationManager()
+        self.auth_manager = CertAuthenticationManager()
         self.parameter_manager = ParameterManager()
         self.theme_manager = ThemeManager()
         self.offline_sync_manager = OfflineSyncManager()
+        
+        # Cliente da API para sincronização online
+        self.enable_api_sync = enable_api_sync
+        self.api_client = CertificateAPIClient(dev_mode=api_dev_mode) if enable_api_sync else None
+        
         self.output_dir = output_dir
         os.makedirs(self.output_dir, exist_ok=True)
 
@@ -360,3 +367,82 @@ class CertificateService:
             result["error"] = f"Erro na geração do certificado: {str(e)}"
         
         return result
+    
+    def sync_certificate_to_api(self, auth_code: str, participant_name: str, 
+                               event_name: str) -> bool:
+        """
+        Sincroniza um certificado individual com a API do servidor
+        
+        Args:
+            auth_code: Código de autenticação do certificado
+            participant_name: Nome do participante
+            event_name: Nome do evento
+        
+        Returns:
+            True se sincronizado com sucesso
+        """
+        if not self.enable_api_sync or not self.api_client:
+            return False
+        
+        try:
+            # Preparar dados do certificado para a API
+            cert_data = {
+                "code": auth_code,
+                "name": participant_name,
+                "event": event_name
+            }
+            
+            # Tentar enviar para a API
+            result = self.api_client.create_certificate(cert_data)
+            
+            return result is not None
+        
+        except Exception as e:
+            print(f"⚠️ Falha ao sincronizar certificado {auth_code}: {e}")
+            return False
+    
+    def sync_certificates_batch_to_api(self, certificates_data: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """
+        Sincroniza múltiplos certificados com a API em lote
+        
+        Args:
+            certificates_data: Lista de dicionários com dados dos certificados
+                              Cada dicionário deve conter: code, name, event
+        
+        Returns:
+            Dicionário com estatísticas de sincronização
+        """
+        if not self.enable_api_sync or not self.api_client:
+            return {
+                "total": len(certificates_data),
+                "success": 0,
+                "failed": len(certificates_data),
+                "errors": ["API sync não está habilitado"]
+            }
+        
+        try:
+            return self.api_client.create_certificates_batch(certificates_data)
+        except Exception as e:
+            return {
+                "total": len(certificates_data),
+                "success": 0,
+                "failed": len(certificates_data),
+                "errors": [str(e)]
+            }
+    
+    def enable_online_sync(self, dev_mode: bool = True):
+        """
+        Habilita sincronização online com a API
+        
+        Args:
+            dev_mode: Se True, usa servidor local
+        """
+        self.enable_api_sync = True
+        self.api_client = CertificateAPIClient(dev_mode=dev_mode)
+        print("✅ Sincronização online habilitada")
+    
+    def disable_online_sync(self):
+        """Desabilita sincronização online com a API"""
+        self.enable_api_sync = False
+        self.api_client = None
+        print("⚠️ Sincronização online desabilitada")
