@@ -197,3 +197,7 @@ config/connectivity.json
 # API Keys (IMPORTANTE: Nunca commitar chaves de API)
 keys/
 *.key
+*.db
+*.db-Shm
+*.db-Wal
+*.pyc
