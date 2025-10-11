@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Certificado de Participação</title>
+    <style>
+        @page {
+            size: A4 landscape;
+            margin: 0;
+        }
+        
+        body {
+            width: 297mm;
+            height: 210mm;
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+            background-color: #ffffff;
+            position: relative;
+            border: 4px solid #1a5276;
+            box-sizing: border-box;
+            /* Background será aplicado pelo tema se configurado */
+        }
+        
+        .certificate-container {
+            position: absolute;
+            top: 30px;
+            left: 30px;
+            right: 30px;
+            bottom: 30px;
+            padding: 20px;
+            box-sizing: border-box;
+            background: transparent;
+            /* Manter transparente para não sobrepor o background do body */
+        }
+        
+        .title {
+            text-align: center;
+            font-size: 36px;
+            font-weight: bold;
+            color: #1a5276;
+            margin-top: 40px;
+            margin-bottom: 20px;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            /* Removido background para ficar transparente */
+            padding: 10px;
+            border-radius: 5px;
+            /* Adicionar sombra de texto para melhor legibilidade */
+            text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.8);
+        }
+        
+        .content {
+            margin-top: 80px;
+            font-size: 20px;
+            line-height: 2.2;
+            text-align: justify;
+            text-indent: 30px;
+            color: #333333;
+            padding: 20px 40px;
+            /* Removido background para ficar transparente */
+            border-radius: 10px;
+            /* Adicionar sombra de texto para melhor legibilidade */
+            text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.8);
+        }
+        
+        .participant-name {
+            font-size: 28px;
+            font-weight: bold;
+            color: #1a4971;
+            border-bottom: 2px solid #1a4971;
+            padding-bottom: 3px;
+            margin: 0 8px;
+            display: inline-block;
+            /* Adicionar sombra de texto para melhor legibilidade */
+            text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.8);
+        }
+        
+        .event-name {
+            font-weight: bold;
+            color: #1a5276;
+            /* Adicionar sombra de texto para melhor legibilidade */
+            text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.8);
+        }
+        
+        .signatures-container {
+            position: absolute;
+            bottom: 120px;
+            left: 0;
+            right: 0;
+            display: flex;
+            justify-content: center;
+            padding: 0 100px;
+        }
+        
+        .signature {
+            text-align: center;
+            width: 200px;
+            /* Removido background para ficar transparente */
+            padding: 10px;
+            border-radius: 5px;
+            /* Adicionar sombra de texto para melhor legibilidade */
+            text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.8);
+        }
+        
+        .signature-image {
+            width: 120px;
+            height: 120px;
+            margin: 0 auto 10px auto;
+            display: block;
+            object-fit: contain;
+            /* Sombra para destacar a imagem */
+            filter: drop-shadow(1px 1px 2px rgba(0, 0, 0, 0.3));
+        }
+        
+        .signature-image-placeholder {
+            width: 150px;
+            height: 60px;
+            margin: 0 auto 10px auto;
+            display: none; /* Oculto por padrão quando não há imagem */
+        }
+        
+        .signature-line {
+            width: 180px;
+            border-top: 1px solid #333;
+            margin: 0 auto 8px auto;
+        }
+        
+        .signature-name {
+            font-weight: bold;
+            margin-bottom: 5px;
+            font-size: 14px;
+            color: #333333;
+        }
+        
+        .signature-title {
+            font-size: 12px;
+            color: #666;
+            font-style: italic;
+        }
+        
+        .footer {
+            position: absolute;
+            bottom: 30px;
+            left: 40px;
+            right: 40px;
+            font-size: 11px;
+            text-align: center;
+            color: #666;
+            line-height: 1.4;
+            /* Removido background para ficar transparente */
+            padding: 10px;
+            border-radius: 5px;
+            /* Adicionar sombra de texto para melhor legibilidade */
+            text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.8);
+        }
+        
+        .verification-info {
+            margin-bottom: 10px;
+        }
+        
+        .emission-info {
+            font-size: 9px;
+            color: #888;
+            font-style: italic;
+        }
+        
+        .nepemcert-link {
+            color: #1a5276;
+            text-decoration: none;
+            font-weight: bold;
+        }
+        
+        .nepemcert-link:hover {
+            text-decoration: underline;
+        }
+        
+        #qr-code-placeholder {
+            position: absolute;
+            bottom: 110px;
+            left: 110px;
+            width: 120px;
+            height: 120px;
+            /* Removido background para ficar transparente */
+            border-radius: 5px;
+            padding: 5px;
+            box-sizing: border-box;
+            /* Adicionar uma sombra sutil ao QR code para destacá-lo */
+            filter: drop-shadow(2px 2px 4px rgba(0, 0, 0, 0.3));
+        }
+    </style>
+</head>
+<body>
+    <div class="certificate-container">
+        <div class="title">
+            {{ title_text|default('CERTIFICADO DE PARTICIPAÇÃO') }}
+        </div>
+        
+        <div class="content">
+            {{ intro_text|default('Certificamos que') }} 
+            <span class="participant-name">{{ nome }}</span> 
+            {{ participation_text|default('participou do evento') }} 
+            <span class="event-name">{{ evento }}</span>, 
+            {{ location_text|default('realizado em') }} {{ local }} 
+            {{ date_text|default('nos dias') }} {{ data }}, 
+            {{ workload_text|default('com carga horária total de') }} 
+            <strong>{{ carga_horaria }} {{ hours_text|default('horas') }}</strong>.
+        </div>
+        
+        <div class="signatures-container">
+            <div class="signature">
+                {% if signature_image %}
+                <img src="data:image/png;base64,{{ signature_image }}" alt="Assinatura" class="signature-image">
+                {% else %}
+                <div class="signature-image-placeholder"></div>
+                {% endif %}
+                <div class="signature-line"></div>
+                <div class="signature-name">{{ coordenador }}</div>
+                <div class="signature-title">Coordenador-geral</div>
+            </div>
+        </div>
+        
+        <div id="qr-code-placeholder"></div>
+        
+        <div class="footer">
+            <div class="verification-info">
+                A autenticidade deste certificado pode ser verificada em: <strong>{{ url_verificacao }}</strong> 
+                com o código <strong>{{ codigo_verificacao }}</strong>.
+            </div>
+            <div class="emission-info">
+                Este certificado foi emitido em {{ cidade }}, {{ data_emissao }}, utilizando <a href="https://www.github.com/NEPEM-UFSC/nepemcert" class="nepemcert-link" target="_blank" rel="noopener">NEPEMCERT</a>.
+            </div>
+        </div>
+    </div>
+</body>
+</html>

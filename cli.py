@@ -100,6 +100,25 @@ def quiet_checkbox(message, choices, **kwargs):
         console.print(f"[red]Erro ao exibir checkbox: {e}[/red]")
         return []
 
+
+def get_menu_style():
+    """Retorna o estilo padrão para menus do questionary."""
+    from questionary import Style
+    
+    return Style([
+        ('qmark', 'fg:#ff9d00 bold'),
+        ('question', 'bold'),
+        ('answer', 'fg:#ff9d00 bold'),
+        ('pointer', 'fg:#ff9d00 bold'),
+        ('highlighted', 'fg:#ff9d00 bold'),
+        ('selected', 'fg:#cc5454'),
+        ('separator', 'fg:#cc5454'),
+        ('instruction', ''),
+        ('text', ''),
+        ('disabled', 'fg:#858585 italic')
+    ])
+
+
 def quiet_path(message, **kwargs):
     """Wrapper para questionary.path que suprime mensagens de erro."""
     try:
@@ -535,7 +554,6 @@ def preview_template():
 
 
 # Funções de implementação para as demais opções de menu (básicas)
-
 def configure_directories():
     """Configura os diretórios de trabalho."""
     console.print("[yellow]Esta funcionalidade está planejada para uma futura atualização. Obrigado pela sua compreensão.[/yellow]")
@@ -659,6 +677,7 @@ def configure_theme_placeholders():
     console.print("[yellow]Esta funcionalidade está planejada para uma futura atualização. Obrigado pela sua compreensão.[/yellow]")
     input("\nPressione Enter para voltar...")
 
+
 def manage_presets():
     """Gerencia presets de configuração."""
     console.print("[yellow]Esta funcionalidade está planejada para uma futura atualização. Obrigado pela sua compreensão.[/yellow]")
@@ -762,25 +781,6 @@ def verify_authentication_code():
     
     console.print("\n[dim]Pressione Enter para voltar ao menu...[/dim]")
     input()
-
-
-def get_menu_style():
-    """Retorna o estilo padrão para menus do questionary."""
-    from questionary import Style
-    
-    return Style([
-        ('qmark', 'fg:#ff9d00 bold'),
-        ('question', 'bold'),
-        ('answer', 'fg:#ff9d00 bold'),
-        ('pointer', 'fg:#ff9d00 bold'),
-        ('highlighted', 'fg:#ff9d00 bold'),
-        ('selected', 'fg:#cc5454'),
-        ('separator', 'fg:#cc5454'),
-        ('instruction', ''),
-        ('text', ''),
-        ('disabled', 'fg:#858585 italic')
-    ])
-
 
 def settings_menu():
     """Menu de configurações."""
