@@ -211,6 +211,26 @@ def main_menu():
     """Exibe o menu principal da aplicação."""
     print_header()
     
+    # Verificar e exibir alerta de certificados não sincronizados
+    try:
+        from app.offline_sync_manager import OfflineSyncManager
+        sync_manager = OfflineSyncManager()
+        
+        alert = sync_manager.get_sync_alert()
+        if alert:
+            console.print("\n" + "⚠️" * 30, style="yellow")
+            console.print(f"[bold yellow]ALERTA: Existem {alert['total_pendente']} certificados que ainda não foram sincronizados![/bold yellow]")
+            console.print(f"[yellow]  • Pendentes: {alert['pending']}[/yellow]")
+            if alert['failed'] > 0:
+                console.print(f"[yellow]  • Falhados: {alert['failed']}[/yellow]")
+            if alert['retry'] > 0:
+                console.print(f"[yellow]  • Aguardando retry: {alert['retry']}[/yellow]")
+            console.print("[yellow]Acesse 'Sincronização e Conectividade' para sincronizar.[/yellow]")
+            console.print("⚠️" * 30 + "\n", style="yellow")
+    except Exception as e:
+        # Não interromper o menu se houver erro ao verificar alertas
+        pass
+    
     # Lista básica de opções do menu
     menu_options = [
         "🔖 Gerar Certificados",

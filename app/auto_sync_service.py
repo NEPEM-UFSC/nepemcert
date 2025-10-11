@@ -306,7 +306,7 @@ class AutoSyncService:
     
     def _sync_single_certificate(self, cert: CertificateRecord) -> bool:
         """
-        Sincroniza um único certificado com o servidor.
+        Sincroniza um único certificado com o servidor usando writeCertificate.
         
         Args:
             cert (CertificateRecord): Certificado a ser sincronizado.
@@ -315,29 +315,42 @@ class AutoSyncService:
             bool: True se sincronizado com sucesso.
         """
         try:
-            # Preparar dados para o servidor
+            # Preparar dados no formato esperado pela API writeCertificate
+            # Campos obrigatórios: code, name, event
             sync_data = {
-                'codigo_autenticacao': cert.codigo_autenticacao,
-                'nome_participante': cert.nome_participante,
-                'evento': cert.evento,
-                'data_evento': cert.data_evento,
-                'local_evento': cert.local_evento,
-                'carga_horaria': cert.carga_horaria,
+                'code': cert.codigo_autenticacao,
+                'name': cert.nome_participante,
+                'event': cert.evento,
+                # Campos adicionais
+                'dataEvento': cert.data_evento,
+                'localEvento': cert.local_evento,
+                'cargaHoraria': cert.carga_horaria,
                 'coordenador': cert.coordenador,
                 'diretor': cert.diretor,
-                'data_geracao': cert.data_geracao,
-                'url_verificacao': cert.url_verificacao,
-                'template_usado': cert.template_usado,
-                'tema_usado': cert.tema_usado,
+                'dataGeracao': cert.data_geracao,
+                'urlVerificacao': cert.url_verificacao,
+                'templateUsado': cert.template_usado,
+                'temaUsado': cert.tema_usado,
                 'checksum': cert.checksum
             }
             
-            # Fazer requisição para o servidor
-            url = f"{self.server_url}/certificates/register"
-            headers = {
-                'Content-Type': 'application/json',
-                'User-Agent': 'NEPEMCERT-AutoSync/1.0'
-            }
+            # Fazer requisição para o endpoint writeCertificate
+            url = f"{self.server_url}/writeCertificate"
+            
+            # Carregar chave de API para autenticação
+            from .api_key_manager import APIKeyManager
+            key_manager = APIKeyManager()
+            
+            # Tentar carregar chave issuer ou reader
+            auth_key = key_manager.autoload_keys(['issuer', 'reader'])
+            
+            if not auth_key:
+                logger.error("Nenhuma chave de API disponível para sincronização")
+                return False
+            
+            # Obter headers com autenticação JWT
+            headers = key_manager.get_auth_headers(auth_key)
+            headers['User-Agent'] = 'NEPEMCERT-AutoSync/1.0'
             
             response = requests.post(
                 url,
@@ -346,7 +359,7 @@ class AutoSyncService:
                 timeout=30
             )
             
-            if response.status_code == 200:
+            if response.status_code == 201:
                 logger.debug(f"Certificado {cert.codigo_autenticacao} sincronizado com sucesso")
                 return True
             elif response.status_code == 409:
@@ -355,6 +368,11 @@ class AutoSyncService:
                 return True  # Considerar como sucesso
             else:
                 logger.warning(f"Falha na sincronização - Status: {response.status_code}")
+                try:
+                    error_detail = response.json()
+                    logger.warning(f"Detalhes do erro: {error_detail}")
+                except:
+                    pass
                 return False
                 
         except requests.RequestException as e:

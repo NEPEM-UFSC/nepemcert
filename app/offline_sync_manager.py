@@ -536,6 +536,105 @@ class OfflineSyncManager:
             logger.error(f"Erro ao obter estatísticas: {e}")
             return {}
     
+    def has_pending_certificates(self) -> bool:
+        """
+        Verifica se existem certificados pendentes de sincronização.
+        
+        Returns:
+            bool: True se existem certificados pendentes.
+        """
+        try:
+            with sqlite3.connect(self.db_path, timeout=10.0) as conn:
+                conn.execute("PRAGMA busy_timeout = 10000")
+                cursor = conn.execute('''
+                    SELECT COUNT(*) FROM certificates 
+                    WHERE sync_status IN ('pending', 'failed', 'retry')
+                ''')
+                
+                count = cursor.fetchone()[0]
+                return count > 0
+                
+        except sqlite3.Error as e:
+            logger.error(f"Erro ao verificar certificados pendentes: {e}")
+            return False
+    
+    def get_pending_count(self) -> int:
+        """
+        Obtém o número de certificados pendentes de sincronização.
+        
+        Returns:
+            int: Número de certificados pendentes.
+        """
+        try:
+            with sqlite3.connect(self.db_path, timeout=10.0) as conn:
+                conn.execute("PRAGMA busy_timeout = 10000")
+                cursor = conn.execute('''
+                    SELECT COUNT(*) FROM certificates 
+                    WHERE sync_status IN ('pending', 'failed', 'retry')
+                ''')
+                
+                return cursor.fetchone()[0]
+                
+        except sqlite3.Error as e:
+            logger.error(f"Erro ao contar certificados pendentes: {e}")
+            return 0
+    
+    def get_sync_alert(self) -> Optional[Dict[str, Any]]:
+        """
+        Obtém informações de alerta sobre certificados não sincronizados.
+        
+        Returns:
+            Dict com informações do alerta ou None se não há certificados pendentes.
+        """
+        try:
+            with sqlite3.connect(self.db_path, timeout=10.0) as conn:
+                conn.execute("PRAGMA busy_timeout = 10000")
+                
+                # Contar por status
+                cursor = conn.execute('''
+                    SELECT sync_status, COUNT(*) 
+                    FROM certificates 
+                    WHERE sync_status IN ('pending', 'failed', 'retry')
+                    GROUP BY sync_status
+                ''')
+                
+                status_counts = dict(cursor.fetchall())
+                total_pending = sum(status_counts.values())
+                
+                if total_pending == 0:
+                    return None
+                
+                # Obter certificados mais antigos não sincronizados
+                cursor = conn.execute('''
+                    SELECT nome_participante, evento, created_at
+                    FROM certificates 
+                    WHERE sync_status IN ('pending', 'failed', 'retry')
+                    ORDER BY created_at ASC
+                    LIMIT 3
+                ''')
+                
+                oldest_certs = [
+                    {
+                        'nome': row[0],
+                        'evento': row[1],
+                        'criado_em': row[2]
+                    }
+                    for row in cursor.fetchall()
+                ]
+                
+                return {
+                    'total_pendente': total_pending,
+                    'pending': status_counts.get('pending', 0),
+                    'failed': status_counts.get('failed', 0),
+                    'retry': status_counts.get('retry', 0),
+                    'certificados_antigos': oldest_certs,
+                    'timestamp': datetime.now().isoformat()
+                }
+                
+        except sqlite3.Error as e:
+            logger.error(f"Erro ao obter alerta de sincronização: {e}")
+            return None
+    
     def cleanup_synced_records(self, days_old: int = 30) -> int:
         """
         Remove registros sincronizados antigos para economizar espaço.

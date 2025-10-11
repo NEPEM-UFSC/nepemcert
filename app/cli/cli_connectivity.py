@@ -114,13 +114,25 @@ def connectivity_menu():
     console.print(f"[bold]Status atual:[/bold] [{status_color}]{status_info['status']}[/{status_color}]")
     console.print(f"[bold]Última verificação:[/bold] {status_info.get('last_check', 'Nunca')}")
     
+    # Verificar certificados não sincronizados
+    try:
+        from app.offline_sync_manager import OfflineSyncManager
+        sync_manager = OfflineSyncManager()
+        
+        pending_count = sync_manager.get_pending_count()
+        if pending_count > 0:
+            console.print(f"\n[yellow]⚠️  {pending_count} certificado(s) aguardando sincronização[/yellow]")
+    except Exception:
+        pass
+    
     choice = quiet_select(
-        "O que você deseja fazer?",
+        "\nO que você deseja fazer?",
         choices=[
             "🔄 Verificar conexão",
             "⚙️ Configurar servidor",
-            "📤 Enviar Certificados Gerados",
+            "📤 Sincronizar Certificados Pendentes",
             "📥 Baixar Templates do Servidor",
+            "📊 Ver Estatísticas de Sincronização",
             "📋 Histórico de sincronização", 
             "↩️ Voltar ao menu principal"
         ],
@@ -155,8 +167,12 @@ def connectivity_menu():
         configure_remote_server()
         connectivity_menu()
     
-    elif choice == "📤 Enviar Certificados Gerados":
-        upload_certificates_ui()
+    elif choice == "📤 Sincronizar Certificados Pendentes":
+        sync_pending_certificates()
+        connectivity_menu()
+    
+    elif choice == "📊 Ver Estatísticas de Sincronização":
+        show_sync_statistics()
         connectivity_menu()
 
     elif choice == "📥 Baixar Templates do Servidor": 
@@ -179,6 +195,112 @@ def show_sync_history_stub():
     console.print("\n[dim]Pressione Enter para voltar ao menu...[/dim]")
     input()
     connectivity_menu() # Return to connectivity menu
+
+
+def sync_pending_certificates():
+    """Sincroniza certificados pendentes no banco de dados local."""
+    console.clear()
+    console.print("[bold blue]== Sincronizar Certificados Pendentes ==[/bold blue]\n")
+    
+    try:
+        from app.offline_sync_manager import OfflineSyncManager
+        from app.auto_sync_service import AutoSyncService
+        
+        sync_manager = OfflineSyncManager()
+        
+        # Verificar se há certificados pendentes
+        pending_count = sync_manager.get_pending_count()
+        
+        if pending_count == 0:
+            console.print("[green]✓ Todos os certificados estão sincronizados![/green]")
+            console.print("\n[dim]Pressione Enter para voltar ao menu...[/dim]")
+            input()
+            return
+        
+        console.print(f"[yellow]Encontrados {pending_count} certificado(s) pendente(s) de sincronização.[/yellow]\n")
+        
+        confirm = quiet_confirm("Deseja iniciar a sincronização agora?", default=True)
+        if not confirm:
+            console.print("[yellow]Sincronização cancelada.[/yellow]")
+            console.print("\n[dim]Pressione Enter para voltar ao menu...[/dim]")
+            input()
+            return
+        
+        # Iniciar serviço de sincronização
+        console.print("\n[bold green]Iniciando sincronização...[/bold green]")
+        auto_sync = AutoSyncService()
+        
+        with console.status("[bold green]Sincronizando certificados...") as status:
+            result = auto_sync.force_sync()
+        
+        console.print("\n[bold]Resultado da Sincronização:[/bold]")
+        console.print(f"[green]✓ Sincronizados com sucesso: {result.get('success', 0)}[/green]")
+        
+        if result.get('failed', 0) > 0:
+            console.print(f"[red]✗ Falhas: {result.get('failed', 0)}[/red]")
+        
+        if result.get('error'):
+            console.print(f"[red]Erro: {result['error']}[/red]")
+        
+    except Exception as e:
+        console.print(f"[red]Erro durante sincronização: {str(e)}[/red]")
+    
+    console.print("\n[dim]Pressione Enter para voltar ao menu...[/dim]")
+    input()
+
+
+def show_sync_statistics():
+    """Exibe estatísticas detalhadas de sincronização."""
+    console.clear()
+    console.print("[bold blue]== Estatísticas de Sincronização ==[/bold blue]\n")
+    
+    try:
+        from app.offline_sync_manager import OfflineSyncManager
+        
+        sync_manager = OfflineSyncManager()
+        stats = sync_manager.get_sync_statistics()
+        
+        if not stats:
+            console.print("[yellow]Não há estatísticas disponíveis.[/yellow]")
+            console.print("\n[dim]Pressione Enter para voltar ao menu...[/dim]")
+            input()
+            return
+        
+        # Criar tabela de estatísticas
+        table = Table(title="Resumo de Sincronização", box=box.ROUNDED)
+        table.add_column("Métrica", style="cyan")
+        table.add_column("Valor", justify="right", style="white")
+        
+        status_counts = stats.get('status_counts', {})
+        
+        table.add_row("Total de Certificados", str(stats.get('total_records', 0)))
+        table.add_row("✓ Sincronizados", f"[green]{stats.get('synced_count', 0)}[/green]")
+        table.add_row("⏳ Pendentes", f"[yellow]{stats.get('pending_count', 0)}[/yellow]")
+        table.add_row("🔄 Aguardando Retry", f"[blue]{stats.get('retry_count', 0)}[/blue]")
+        table.add_row("✗ Falhados", f"[red]{stats.get('failed_count', 0)}[/red]")
+        table.add_row("", "")  # Linha vazia
+        table.add_row("Últimas 24h", str(stats.get('last_24h_count', 0)))
+        table.add_row("Média de Tentativas", f"{stats.get('avg_sync_attempts', 0):.1f}")
+        table.add_row("Máximo de Tentativas", str(stats.get('max_sync_attempts', 0)))
+        
+        console.print(table)
+        
+        # Mostrar alerta se houver pendentes
+        alert = sync_manager.get_sync_alert()
+        if alert:
+            console.print("\n[bold yellow]⚠️  Certificados Mais Antigos Não Sincronizados:[/bold yellow]")
+            for cert in alert.get('certificados_antigos', []):
+                console.print(f"  • [cyan]{cert['nome']}[/cyan] - {cert['evento']}")
+                console.print(f"    Criado em: {cert['criado_em']}")
+        
+        console.print(f"\n[dim]Banco de dados: {stats.get('db_path', 'N/A')}[/dim]")
+        console.print(f"[dim]Última atualização: {stats.get('last_updated', 'N/A')}[/dim]")
+        
+    except Exception as e:
+        console.print(f"[red]Erro ao obter estatísticas: {str(e)}[/red]")
+    
+    console.print("\n[dim]Pressione Enter para voltar ao menu...[/dim]")
+    input()
 
 
 def check_connection():
