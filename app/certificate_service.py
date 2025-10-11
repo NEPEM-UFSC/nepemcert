@@ -66,7 +66,7 @@ class CertificateService:
             # 3. Verificar se a primeira coluna contém os nomes
             if len(df.columns) == 0:
                 result["failed_count"] = -1
-                result["errors"].append("CSV has no columns")
+                result["errors"].append("CSV file contains no data columns")
                 return result
             
             # 4. Garantir que estamos usando a primeira coluna como nome
