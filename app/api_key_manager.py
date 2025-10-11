@@ -63,19 +63,9 @@ class APIKeyManager:
     para autenticação com o servidor certificados.nepemufsc.com
     """
     
-    # Chaves master para bootstrap (hardcoded conforme exemplo)
-    MASTER_KEYS = {
-        "admin": {
-            "keyId": "masterkey",
-            "secret": "1JyBzZOKMnLGLnfpPl3g8jb9iYu3t1ryDgcZnG4lgYJoVyBk",
-            "role": "admin"
-        },
-        "bootstrap": {
-            "keyId": "nepemcert-bootstrap",
-            "secret": "nepemcert-bootstrap-secret",
-            "role": "bootstrap"
-        }
-    }
+    # Chave bootstrap para configuração inicial
+    BOOTSTRAP_KEY_ID = "nepemcert-bootstrap"
+    BOOTSTRAP_SECRET = "nepemcert-bootstrap-secret"
     
     VALID_ROLES = ["admin", "issuer", "reader", "bootstrap"]
     
@@ -270,28 +260,31 @@ class APIKeyManager:
             for key in self._loaded_keys.values()
         ]
     
-    def get_master_key(self, role: str = "admin") -> Optional[APIKey]:
+    def get_master_key(self, key: str = "") -> Optional[APIKey]:
         """
         Retorna uma chave master (admin ou bootstrap)
         
         Args:
-            role: 'admin' ou 'bootstrap'
+            key: "bootstrap" para chave bootstrap, vazio para chave admin
         
         Returns:
             APIKey master ou None
         """
-        if role not in ["admin", "bootstrap"]:
-            return None
-        
-        master_data = self.MASTER_KEYS[role]
-        return APIKey(
-            key_id=master_data["keyId"],
-            secret=master_data["secret"],
-            role=master_data["role"],
-            description=f"Master {role} key",
-            is_active=True
-        )
-    
+        if key == "bootstrap":
+            # Para bootstrap, retorna uma chave simples com as constantes
+            return APIKey(
+                key_id=self.BOOTSTRAP_KEY_ID,
+                secret=self.BOOTSTRAP_SECRET,
+                role="bootstrap",
+                description="Chave bootstrap para configuração inicial",
+                is_active=True
+            )
+        else:
+            # Tenta encontrar uma chave admin carregada
+            for loaded_key in self._loaded_keys.values():
+                if loaded_key.role == "admin":
+                    return loaded_key
+
     def create_key_data(self, role: str, is_active: bool = True, 
                        description: str = "") -> Dict[str, Any]:
         """

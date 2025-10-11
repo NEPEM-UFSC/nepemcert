@@ -103,43 +103,55 @@ def api_keys_menu():
 
 
 def setup_initial_keys(api_client: CertificateAPIClient):
-    """Configura chaves iniciais (issuer e reader)"""
+    """Configura chave inicial READER"""
     console.clear()
     console.print(Panel.fit(
         "[bold cyan]Configuração Inicial de Chaves[/bold cyan]\n"
-        "[dim]Cria chaves issuer e reader usando a chave master admin[/dim]",
+        "[dim]Cria uma chave READER usando a chave bootstrap[/dim]",
         border_style="cyan"
     ))
-    
+
     console.print("\n⚠️ Esta operação criará:")
-    console.print("  • Uma chave [green]ISSUER[/green] (para registrar certificados)")
     console.print("  • Uma chave [blue]READER[/blue] (para consultar certificados)")
-    console.print("\n[yellow]As chaves serão salvas no diretório 'keys/'[/yellow]")
-    
+    console.print("\n[yellow]A chave será salva no diretório 'keys/'[/yellow]")
+
     try:
-        from cli import quiet_confirm
+        from cli import quiet_text, quiet_confirm
     except ImportError:
         import questionary
+        quiet_text = questionary.text
         quiet_confirm = questionary.confirm
-    
-    if not quiet_confirm("\nDeseja continuar?", default=False):
+
+    # Coletar descrição customizada
+    description = quiet_text(
+        "\nDescrição/Nome da chave(Use seu nome, por favor):",
+        default="usuario nepemcert"
+    )
+
+    if not quiet_confirm(f"\nCriar chave READER com descrição '{description}'?", default=True):
         return
-    
+
     try:
-        with console.status("[bold green]Criando chaves..."):
-            results = api_client.setup_initial_keys()
-        
-        console.print("\n" + "="*60)
-        if results['issuer']:
-            console.print("✅ Chave ISSUER criada:", results['issuer'].key_id)
+        with console.status("[bold green]Criando chave READER..."):
+            reader_key = api_client.setup_initial_keys(description=description)
+
+        if reader_key:
+            console.print("\n" + "="*60)
+            console.print("✅ Chave READER criada com sucesso!")
+            console.print(f"   ID: [cyan]{reader_key.key_id}[/cyan]")
+            console.print(f"   Descrição: [blue]{reader_key.description}[/blue]")
+            console.print(f"\n💾 Chave salva em: [dim]keys/{reader_key.role}_{reader_key.key_id}_*.key[/dim]")
+
+            # Mensagem de aviso sobre privilégios
+            console.print("\n" + "⚠️" * 30, style="yellow")
+            console.print("[bold yellow]IMPORTANTE:[/bold yellow]")
+            console.print("[yellow]Você deve entrar em contato com um usuário com permissão de administrador[/yellow]")
+            console.print("[yellow]para subir seu privilégio e ser capaz de inserir códigos de verificação no servidor.[/yellow]")
+            console.print("[yellow]Os certificados que você produzir não poderão ser verificados e não terão validade.[/yellow]")
+            console.print("⚠️" * 30, style="yellow")
         else:
-            console.print("❌ Falha ao criar chave ISSUER")
-        
-        if results['reader']:
-            console.print("✅ Chave READER criada:", results['reader'].key_id)
-        else:
-            console.print("❌ Falha ao criar chave READER")
-        
+            console.print("\n❌ Falha ao criar chave READER", style="bold red")
+
     except Exception as e:
         console.print(f"\n❌ Erro durante configuração: {e}", style="bold red")
 
@@ -183,9 +195,6 @@ def create_new_key(api_client: CertificateAPIClient, key_manager: APIKeyManager)
     try:
         # Verificar se tem chave para autenticação
         auth_key = key_manager.get_active_key()
-        if not auth_key:
-            console.print("\n⚠️ Tentando usar chave master admin...", style="yellow")
-            auth_key = key_manager.get_master_key('admin')
         
         with console.status(f"[bold green]Criando chave {role}..."):
             new_key = api_client.create_api_key(

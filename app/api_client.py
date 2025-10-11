@@ -153,12 +153,7 @@ class CertificateAPIClient:
         
         # Obter chave de autenticação
         if not auth_key:
-            # Tentar autoload de chave admin/issuer
             auth_key = self.key_manager.autoload_keys(['admin', 'issuer'])
-            
-            if not auth_key:
-                # Usar chave master admin como fallback
-                auth_key = self.key_manager.get_master_key('admin')
         
         if not auth_key:
             raise APIClientError("Nenhuma chave de autenticação disponível")
@@ -167,7 +162,7 @@ class CertificateAPIClient:
         request_data = {
             "role": role,
             "isActive": is_active,
-            "description": description or f"Chave {role} criada via NEPEMCERT"
+            "description": description or f"{role}-NEPEMCERT-{int(time.time())}"
         }
         
         # Obter headers com JWT
@@ -383,55 +378,50 @@ class CertificateAPIClient:
         except:
             return False
     
-    def setup_initial_keys(self) -> Dict[str, Optional[APIKey]]:
+    def setup_initial_keys(self, description: str = "") -> Optional[APIKey]:
         """
-        Configura chaves iniciais (issuer e reader) usando chave master
-        
+        Configura chave inicial READER usando chave bootstrap
+
+        Args:
+            description: Descrição customizada para a chave READER
+
         Returns:
-            Dicionário com as chaves criadas
+            Chave READER criada ou None se falhar
         """
-        print("\n🔑 Configurando chaves iniciais do NEPEMCERT...")
+        print("\n🔑 Configurando chave inicial do NEPEMCERT...")
         print("=" * 60)
-        
-        master_key = self.key_manager.get_master_key('admin')
-        
-        results = {
-            'issuer': None,
-            'reader': None
-        }
-        
-        # Criar chave issuer
+
+        # Usar chave bootstrap para autenticação
+        bootstrap_key = self.key_manager.get_master_key('bootstrap')
+
+        if not bootstrap_key:
+            print("❌ Erro: Chave bootstrap não encontrada")
+            return None
+
+        # Criar chave reader com descrição customizada
         try:
-            print("\n1. Criando chave ISSUER...")
-            issuer_key = self.create_api_key(
-                role="issuer",
-                is_active=True,
-                description="Chave de escrita para NEPEMCERT",
-                auth_key=master_key,
-                save_to_file=True
-            )
-            results['issuer'] = issuer_key
-        except Exception as e:
-            print(f"❌ Erro ao criar chave issuer: {e}")
-        
-        # Criar chave reader
-        try:
-            print("\n2. Criando chave READER...")
+            print("\nCriando chave READER...")
             reader_key = self.create_api_key(
                 role="reader",
                 is_active=True,
-                description="Chave de leitura para NEPEMCERT",
-                auth_key=master_key,
+                description=description or "Chave de leitura criada via configuração inicial",
+                auth_key=bootstrap_key,
                 save_to_file=True
             )
-            results['reader'] = reader_key
+
+            if reader_key:
+                print("\n" + "=" * 60)
+                print("✅ Configuração inicial concluída!")
+                print(f"   Chave READER criada: {reader_key.key_id}")
+                print(f"   Descrição: {reader_key.description}")
+                return reader_key
+            else:
+                print("❌ Falha ao criar chave READER")
+                return None
+
         except Exception as e:
             print(f"❌ Erro ao criar chave reader: {e}")
-        
-        print("\n" + "=" * 60)
-        print("✅ Configuração inicial concluída!")
-        
-        return results
+            return None
 
 
 # Instância global para facilitar uso
