@@ -194,7 +194,6 @@ app/__pycache__/*
 app/__pycache__/__init__.cpython-311.pyc
 config/connectivity.json
 
-# API Keys (IMPORTANTE: Nunca commitar chaves de API)
 keys/
 *.key
 *.db
