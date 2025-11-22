@@ -37,7 +37,7 @@ def interactive():
 @cli.command()
 @click.argument("csv_file", type=click.Path(exists=True))
 @click.argument("template", type=click.Path(exists=True))
-@click.option("--output", "-o", default="output", help="Diretório de saída para os certificados")
+@click.option("--output", "-o", default=None, help="Diretório de saída para os certificados (padrão: configurado ou 'output')")
 @click.option("--zip", "-z", is_flag=True, help="Criar arquivo ZIP com os certificados")
 @click.option("--zip-name", default=None, help="Nome do arquivo ZIP")
 def generate(csv_file, template, output, zip, zip_name):
@@ -52,7 +52,17 @@ def generate(csv_file, template, output, zip, zip_name):
     from app.certificate_service import CertificateService # Import CertificateService
     from app.zip_exporter import ZipExporter
     from app.template_manager import TemplateManager as GlobalTemplateManager # Alias for local instance
+    from app.parameter_manager import ParameterManager # Import ParameterManager
     
+    # Determine output directory if not provided
+    if output is None:
+        pm = ParameterManager()
+        # Check if get_directories exists (it should with recent updates)
+        if hasattr(pm, 'get_directories'):
+            output = pm.get_directories().get("output", "output")
+        else:
+            output = "output"
+
     console.print(f"[bold blue]Gerando certificados...[/bold blue]")
     console.print(f"- Arquivo CSV: [cyan]{csv_file}[/cyan]")
     console.print(f"- Template: [cyan]{template}[/cyan]")
@@ -178,9 +188,8 @@ def generate(csv_file, template, output, zip, zip_name):
 @cli.command()
 def config():
     """Gerencia as configurações do aplicativo."""
-    console.print("[bold blue]Gerenciando configurações...[/bold blue]")
-    console.print("[yellow]Este comando ainda não está completamente implementado.[/yellow]")
-    console.print("[cyan]Use o modo interativo para configurar o aplicativo:[/cyan] nepemcert interactive")
+    from cli import settings_menu
+    settings_menu()
 
 
 @cli.command()
@@ -686,7 +695,7 @@ def debug_themes(template, output, zip):
 @click.option("--local", help="Local do evento")
 @click.option("--carga-horaria", help="Carga horária do evento")
 @click.option("--theme", help="Nome do tema a ser aplicado")
-@click.option("--output", "-o", default="output", help="Diretório de saída para o certificado")
+@click.option("--output", "-o", default=None, help="Diretório de saída para o certificado (padrão: configurado ou 'output')")
 def generate_single(participant_name, template, evento, data, local, carga_horaria, theme, output):
     """
     Gera um único certificado para um participante.
@@ -696,8 +705,17 @@ def generate_single(participant_name, template, evento, data, local, carga_horar
     """
     from app.certificate_service import CertificateService
     from app.template_manager import TemplateManager as GlobalTemplateManager
+    from app.parameter_manager import ParameterManager
     from datetime import datetime
     
+    # Determine output directory if not provided
+    if output is None:
+        pm = ParameterManager()
+        if hasattr(pm, 'get_directories'):
+            output = pm.get_directories().get("output", "output")
+        else:
+            output = "output"
+
     console.print(f"[bold blue]Gerando certificado único...[/bold blue]")
     console.print(f"- Participante: [cyan]{participant_name}[/cyan]")
     console.print(f"- Template: [cyan]{template}[/cyan]")

@@ -16,20 +16,33 @@ from .api_client import CertificateAPIClient  # Nova importação
 
 
 class CertificateService:
-    def __init__(self, output_dir="output", enable_api_sync=True, api_dev_mode=True):
+    def __init__(self, output_dir=None, enable_api_sync=True, api_dev_mode=True):
         self.csv_manager = CSVManager()
         self.template_manager = TemplateManager()
-        self.pdf_generator = PDFGenerator(output_dir=output_dir)
         self.auth_manager = CertAuthenticationManager()
         self.parameter_manager = ParameterManager()
         self.theme_manager = ThemeManager()
         self.offline_sync_manager = OfflineSyncManager()
         
+        # Determine output directory
+        if output_dir is None:
+            # Try to get from parameter manager
+            # Note: get_directories might not exist in older versions of ParameterManager, 
+            # so we handle it safely or assume it was added as per previous steps.
+            if hasattr(self.parameter_manager, 'get_directories'):
+                directories = self.parameter_manager.get_directories()
+                self.output_dir = directories.get("output", "output")
+            else:
+                self.output_dir = "output"
+        else:
+            self.output_dir = output_dir
+            
+        self.pdf_generator = PDFGenerator(output_dir=self.output_dir)
+        
         # Cliente da API para sincronização online
         self.enable_api_sync = enable_api_sync
         self.api_client = CertificateAPIClient(dev_mode=api_dev_mode) if enable_api_sync else None
         
-        self.output_dir = output_dir
         os.makedirs(self.output_dir, exist_ok=True)
 
     def generate_certificates_batch(self, csv_file_path, event_details, template_name, theme_name=None, has_header=True, use_multiprocessing=False):

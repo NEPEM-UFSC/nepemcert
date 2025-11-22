@@ -1,1 +1,0 @@
-# Fila de sincronização offline

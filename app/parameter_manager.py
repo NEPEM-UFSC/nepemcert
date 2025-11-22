@@ -229,3 +229,62 @@ class ParameterManager:
             result.update(csv_data)
         
         return result
+    
+    def get_directories(self):
+        """
+        Retorna as configurações de diretórios.
+        
+        Returns:
+            dict: Dicionário com os diretórios configurados
+        """
+        return self.parameters.get("directories", {
+            "output": "output",
+            "templates": "templates",
+            "uploads": "uploads"
+        })
+    
+    def set_directory(self, key, path):
+        """
+        Define um caminho de diretório.
+        
+        Args:
+            key (str): Chave do diretório (output, templates, uploads)
+            path (str): Caminho do diretório
+            
+        Returns:
+            bool: True se salvo com sucesso
+        """
+        if "directories" not in self.parameters:
+            self.parameters["directories"] = {
+                "output": "output",
+                "templates": "templates",
+                "uploads": "uploads"
+            }
+            
+        self.parameters["directories"][key] = path
+        return self.save_parameters()
+
+    def get_default_theme(self):
+        """
+        Retorna o tema padrão configurado.
+        
+        Returns:
+            str: Nome do tema padrão ou None
+        """
+        return self.parameters.get("system_settings", {}).get("default_theme", None)
+
+    def set_default_theme(self, theme_name):
+        """
+        Define o tema padrão.
+        
+        Args:
+            theme_name (str): Nome do tema
+            
+        Returns:
+            bool: True se salvo com sucesso
+        """
+        if "system_settings" not in self.parameters:
+            self.parameters["system_settings"] = {}
+            
+        self.parameters["system_settings"]["default_theme"] = theme_name
+        return self.save_parameters()

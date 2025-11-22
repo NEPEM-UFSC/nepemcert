@@ -141,6 +141,7 @@ from app.parameter_manager import ParameterManager
 from app.theme_manager import ThemeManager
 from app.cert_auth_manager import CertAuthenticationManager
 from app.certificate_service import CertificateService # Added CertificateService import
+from app.preset_manager import PresetManager
 from app.utils.app_parameters import APP_VERSION
 
 # Configuração do console Rich
@@ -157,6 +158,7 @@ parameter_manager = ParameterManager()
 theme_manager = ThemeManager()
 auth_manager = CertAuthenticationManager()
 certificate_service = CertificateService() # Instantiated CertificateService
+preset_manager = PresetManager()
 
 
 def check_connection_status():
@@ -580,14 +582,132 @@ def preview_template():
 # Funções de implementação para as demais opções de menu (básicas)
 def configure_directories():
     """Configura os diretórios de trabalho."""
-    console.print("[yellow]Esta funcionalidade está planejada para uma futura atualização. Obrigado pela sua compreensão.[/yellow]")
-    input("\nPressione Enter para voltar...")
+    console.clear()
+    console.print("[bold blue]== Configuração de Diretórios ==[/bold blue]\n")
+    
+    directories = parameter_manager.get_directories()
+    
+    table = Table(show_header=True, header_style="bold blue", box=box.SIMPLE)
+    table.add_column("Tipo", style="cyan")
+    table.add_column("Caminho Atual")
+    
+    for key, path in directories.items():
+        table.add_row(key.capitalize(), path)
+    
+    console.print(table)
+    console.print("\n[dim]Nota: Alterar diretórios pode afetar onde o sistema busca ou salva arquivos.[/dim]\n")
+    
+    choice = quiet_select(
+        "O que você deseja fazer?",
+        choices=[
+            "📂 Alterar diretório de saída (output)",
+            "📂 Alterar diretório de templates",
+            "📂 Alterar diretório de uploads",
+            "↩️ Voltar"
+        ],
+        style=get_menu_style()
+    )
+    
+    if choice == "↩️ Voltar":
+        return
+        
+    key_map = {
+        "📂 Alterar diretório de saída (output)": "output",
+        "📂 Alterar diretório de templates": "templates",
+        "📂 Alterar diretório de uploads": "uploads"
+    }
+    
+    key = key_map.get(choice)
+    if key:
+        current = directories.get(key, key)
+        new_path = quiet_text(f"Novo caminho para {key}:", default=current)
+        
+        if new_path and new_path != current:
+            # Verificar se o diretório existe, se não, perguntar se quer criar
+            if not os.path.exists(new_path):
+                create = quiet_confirm(f"O diretório '{new_path}' não existe. Deseja criá-lo?")
+                if create:
+                    try:
+                        os.makedirs(new_path, exist_ok=True)
+                        console.print(f"[green]✓[/green] Diretório criado.")
+                    except Exception as e:
+                        console.print(f"[red]Erro ao criar diretório: {e}[/red]")
+                        input("\nPressione Enter para continuar...")
+                        configure_directories()
+                        return
+                else:
+                    console.print("[yellow]Operação cancelada. O diretório deve existir.[/yellow]")
+                    input("\nPressione Enter para continuar...")
+                    configure_directories()
+                    return
+            
+            parameter_manager.set_directory(key, new_path)
+            console.print(f"[green]✓[/green] Diretório de {key} atualizado para: {new_path}")
+            
+            # Atualizar gerenciadores se necessário (alguns podem precisar de reinicialização ou setters)
+            # Por enquanto, assume-se que os gerenciadores leem do parameter_manager ou são recriados
+            
+            input("\nPressione Enter para continuar...")
+            configure_directories()
 
 
 def configure_appearance():
     """Configura aparência e tema."""
-    console.print("[yellow]Esta funcionalidade está planejada para uma futura atualização. Obrigado pela sua compreensão.[/yellow]")
-    input("\nPressione Enter para voltar...")
+    console.clear()
+    console.print("[bold blue]== Aparência e Tema ==[/bold blue]\n")
+    
+    default_theme = parameter_manager.get_default_theme() or "Nenhum (Padrão do Sistema)"
+    
+    console.print(f"Tema Padrão Atual: [bold cyan]{default_theme}[/bold cyan]\n")
+    
+    choice = quiet_select(
+        "O que você deseja fazer?",
+        choices=[
+            "🎨 Definir tema padrão",
+            "👁️ Listar temas disponíveis",
+            "↩️ Voltar"
+        ],
+        style=get_menu_style()
+    )
+    
+    if choice == "🎨 Definir tema padrão":
+        themes_list = theme_manager.list_themes()
+        if not themes_list:
+            console.print("[yellow]Nenhum tema disponível.[/yellow]")
+            input("\nPressione Enter para voltar...")
+            return
+
+        new_default = quiet_select(
+            "Selecione o novo tema padrão:",
+            choices=["Nenhum (Remover padrão)"] + themes_list,
+            style=get_menu_style()
+        )
+        
+        if new_default:
+            if new_default == "Nenhum (Remover padrão)":
+                parameter_manager.set_default_theme(None)
+                console.print("[green]✓[/green] Tema padrão removido.")
+            else:
+                parameter_manager.set_default_theme(new_default)
+                console.print(f"[green]✓[/green] Tema padrão definido para: {new_default}")
+            
+            input("\nPressione Enter para continuar...")
+            configure_appearance()
+            
+    elif choice == "👁️ Listar temas disponíveis":
+        themes_list = theme_manager.list_themes()
+        if themes_list:
+            console.print("\n[bold]Temas Disponíveis:[/bold]")
+            for theme in themes_list:
+                console.print(f"  • {theme}")
+        else:
+            console.print("[yellow]Nenhum tema encontrado.[/yellow]")
+        
+        input("\nPressione Enter para continuar...")
+        configure_appearance()
+    
+    elif choice == "↩️ Voltar":
+        return
 
 
 def configure_generation_parameters():
@@ -690,22 +810,253 @@ def configure_institutional_placeholders():
 
 def configure_default_placeholders():
     """Configura valores padrão."""
-    # Implementação básica
-    console.print("[yellow]Esta funcionalidade está planejada para uma futura atualização. Obrigado pela sua compreensão.[/yellow]")
-    input("\nPressione Enter para voltar...")
+    console.clear()
+    console.print("[bold blue]== Configuração de Valores Padrão ==[/bold blue]\n")
+    
+    defaults = parameter_manager.get_default_placeholders()
+    
+    if defaults:
+        console.print("[bold]Valores padrão atuais:[/bold]")
+        table = Table(show_header=True, header_style="bold blue", box=box.SIMPLE)
+        table.add_column("Campo", style="cyan")
+        table.add_column("Valor")
+        
+        for field, value in defaults.items():
+            table.add_row(field, str(value))
+        
+        console.print(table)
+    else:
+        console.print("[yellow]Nenhum valor padrão configurado.[/yellow]")
+    
+    choice = quiet_select(
+        "O que você deseja fazer?",
+        choices=[
+            "➕ Adicionar/editar valor padrão",
+            "🗑️ Remover valor padrão",
+            "↩️ Voltar"
+        ],
+        style=get_menu_style()
+    )
+    
+    if choice == "➕ Adicionar/editar valor padrão":
+        field = quiet_text("Nome do campo (ex: carga_horaria):")
+        if field:
+            value = quiet_text(f"Valor padrão para '{field}':")
+            if field and value:
+                parameter_manager.update_default_placeholders({field: value})
+                console.print(f"[green]✓[/green] Valor padrão para '{field}' atualizado.")
+                configure_default_placeholders()
+                
+    elif choice == "🗑️ Remover valor padrão":
+        if not defaults:
+            console.print("[yellow]Não há valores para remover.[/yellow]")
+            input("\nPressione Enter para voltar...")
+            return
+            
+        field_to_remove = quiet_select(
+            "Selecione o campo para remover:",
+            choices=list(defaults.keys()) + ["Cancelar"],
+            style=get_menu_style()
+        )
+        
+        if field_to_remove and field_to_remove != "Cancelar":
+            confirm = quiet_confirm(f"Tem certeza que deseja remover o valor padrão de '{field_to_remove}'?")
+            if confirm:
+                params = parameter_manager.parameters
+                if "default_placeholders" in params and field_to_remove in params["default_placeholders"]:
+                    del params["default_placeholders"][field_to_remove]
+                    parameter_manager.save_parameters()
+                    console.print(f"[green]✓[/green] Valor padrão de '{field_to_remove}' removido.")
+                configure_default_placeholders()
+                
+    elif choice == "↩️ Voltar":
+        return
 
 
 def configure_theme_placeholders():
     """Configura valores para temas."""
-    # Implementação básica
-    console.print("[yellow]Esta funcionalidade está planejada para uma futura atualização. Obrigado pela sua compreensão.[/yellow]")
-    input("\nPressione Enter para voltar...")
+    console.clear()
+    console.print("[bold blue]== Configuração de Valores por Tema ==[/bold blue]\n")
+    
+    themes_list = theme_manager.list_themes()
+    if not themes_list:
+        console.print("[yellow]Nenhum tema disponível.[/yellow]")
+        input("\nPressione Enter para voltar...")
+        return
+        
+    theme_name = quiet_select(
+        "Selecione o tema para configurar:",
+        choices=themes_list + ["↩️ Voltar"],
+        style=get_menu_style()
+    )
+    
+    if theme_name == "↩️ Voltar" or not theme_name:
+        return
+        
+    # Carregar placeholders do tema
+    theme_placeholders = parameter_manager.get_theme_placeholders(theme_name)
+    
+    console.clear()
+    console.print(f"[bold blue]== Configuração: {theme_name} ==[/bold blue]\n")
+    
+    if theme_placeholders:
+        console.print("[bold]Valores específicos configurados:[/bold]")
+        table = Table(show_header=True, header_style="bold blue", box=box.SIMPLE)
+        table.add_column("Campo", style="cyan")
+        table.add_column("Valor")
+        
+        for field, value in theme_placeholders.items():
+            table.add_row(field, str(value))
+        
+        console.print(table)
+    else:
+        console.print("[yellow]Nenhum valor específico configurado para este tema.[/yellow]")
+        
+    choice = quiet_select(
+        "O que você deseja fazer?",
+        choices=[
+            "➕ Adicionar/editar valor específico",
+            "🗑️ Remover valor específico",
+            "↩️ Voltar"
+        ],
+        style=get_menu_style()
+    )
+    
+    if choice == "➕ Adicionar/editar valor específico":
+        field = quiet_text("Nome do campo:")
+        if field:
+            value = quiet_text(f"Valor para '{field}' no tema '{theme_name}':")
+            if field and value:
+                parameter_manager.update_theme_placeholders(theme_name, {field: value})
+                console.print(f"[green]✓[/green] Valor atualizado.")
+                # Recarregar mesma tela (recursão simples ou loop seria melhor, mas recursão aqui é ok para poucos níveis)
+                configure_theme_placeholders() 
+                
+    elif choice == "🗑️ Remover valor específico":
+        if not theme_placeholders:
+            console.print("[yellow]Não há valores para remover.[/yellow]")
+            input("\nPressione Enter para voltar...")
+            return
+            
+        field_to_remove = quiet_select(
+            "Selecione o campo para remover:",
+            choices=list(theme_placeholders.keys()) + ["Cancelar"],
+            style=get_menu_style()
+        )
+        
+        if field_to_remove and field_to_remove != "Cancelar":
+            confirm = quiet_confirm(f"Remover valor de '{field_to_remove}' do tema '{theme_name}'?")
+            if confirm:
+                params = parameter_manager.parameters
+                if "theme_placeholders" in params and theme_name in params["theme_placeholders"]:
+                    if field_to_remove in params["theme_placeholders"][theme_name]:
+                        del params["theme_placeholders"][theme_name][field_to_remove]
+                        parameter_manager.save_parameters()
+                        console.print(f"[green]✓[/green] Valor removido.")
+                configure_theme_placeholders()
+                
+    elif choice == "↩️ Voltar":
+        configure_theme_placeholders() # Volta para seleção de tema
 
 
 def manage_presets():
     """Gerencia presets de configuração."""
-    console.print("[yellow]Esta funcionalidade está planejada para uma futura atualização. Obrigado pela sua compreensão.[/yellow]")
-    input("\nPressione Enter para voltar...")
+    console.clear()
+    console.print("[bold blue]== Gerenciamento de Presets ==[/bold blue]\n")
+    
+    presets = preset_manager.list_presets()
+    
+    if presets:
+        console.print("[bold]Presets disponíveis:[/bold]")
+        for preset in presets:
+            info = preset_manager.get_preset_info(preset)
+            desc = f" - {info['description']}" if info and info.get('description') else ""
+            console.print(f"  • [cyan]{preset}[/cyan]{desc}")
+        console.print()
+    else:
+        console.print("[yellow]Nenhum preset salvo.[/yellow]\n")
+        
+    choice = quiet_select(
+        "O que você deseja fazer?",
+        choices=[
+            "💾 Salvar configuração atual como preset",
+            "📂 Carregar um preset",
+            "🗑️ Excluir um preset",
+            "↩️ Voltar"
+        ],
+        style=get_menu_style()
+    )
+    
+    if choice == "💾 Salvar configuração atual como preset":
+        name = quiet_text("Nome para o novo preset:")
+        if name:
+            description = quiet_text("Descrição (opcional):")
+            
+            # Coletar configuração atual (exemplo simplificado)
+            # Em um cenário real, coletaríamos o estado atual da geração
+            current_config = {
+                "created": datetime.now().isoformat(),
+                "description": description,
+                "parameters": parameter_manager.parameters
+            }
+            
+            preset_manager.save_preset(name, current_config)
+            console.print(f"[green]✓[/green] Preset '{name}' salvo com sucesso.")
+            input("\nPressione Enter para continuar...")
+            manage_presets()
+            
+    elif choice == "📂 Carregar um preset":
+        if not presets:
+            console.print("[yellow]Nenhum preset para carregar.[/yellow]")
+            input("\nPressione Enter para voltar...")
+            return
+            
+        preset_name = quiet_select(
+            "Selecione o preset para carregar:",
+            choices=presets + ["Cancelar"],
+            style=get_menu_style()
+        )
+        
+        if preset_name and preset_name != "Cancelar":
+            data = preset_manager.load_preset(preset_name)
+            if data:
+                # Aplicar configurações
+                if "parameters" in data:
+                    # Cuidado ao sobrescrever parâmetros globais
+                    confirm = quiet_confirm(f"Isso irá sobrescrever suas configurações atuais com as do preset '{preset_name}'. Continuar?")
+                    if confirm:
+                        parameter_manager.parameters = data["parameters"]
+                        parameter_manager.save_parameters()
+                        console.print(f"[green]✓[/green] Configurações carregadas do preset '{preset_name}'.")
+            else:
+                console.print(f"[red]Erro ao carregar preset.[/red]")
+            
+            input("\nPressione Enter para continuar...")
+            manage_presets()
+            
+    elif choice == "🗑️ Excluir um preset":
+        if not presets:
+            console.print("[yellow]Nenhum preset para excluir.[/yellow]")
+            input("\nPressione Enter para voltar...")
+            return
+            
+        preset_name = quiet_select(
+            "Selecione o preset para excluir:",
+            choices=presets + ["Cancelar"],
+            style=get_menu_style()
+        )
+        
+        if preset_name and preset_name != "Cancelar":
+            confirm = quiet_confirm(f"Tem certeza que deseja excluir o preset '{preset_name}'?")
+            if confirm:
+                preset_manager.delete_preset(preset_name)
+                console.print(f"[green]✓[/green] Preset excluído.")
+                
+            input("\nPressione Enter para continuar...")
+            manage_presets()
+            
+    elif choice == "↩️ Voltar":
+        return
 
 # Função principal do aplicativo
 def main():
