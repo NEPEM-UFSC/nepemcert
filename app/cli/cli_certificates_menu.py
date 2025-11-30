@@ -108,7 +108,7 @@ def generate_certificates_batch():
         console.print("[yellow]Operação cancelada.[/yellow]")
         return
     # Verificar se o CSV tem cabeçalho
-    has_header = quiet_confirm("O arquivo CSV possui linha de cabeçalho?")
+    has_header = quiet_confirm("O arquivo CSV possui linha de cabeçalho (títulos das colunas)?", default=True)
 
     with console.status("[bold green]Carregando dados do CSV..."):
         try:

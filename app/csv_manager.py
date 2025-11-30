@@ -17,10 +17,19 @@ class CSVManager:
             f.write(uploaded_file.getbuffer())
         return file_path
     
-    def load_data(self, file_path):
+    def load_data(self, file_path, has_header=True):
         """Carrega dados de um arquivo CSV"""
         try:
-            return pd.read_csv(file_path)
+            # Se tem cabeçalho, header=0 (padrão). Se não, header=None
+            header = 0 if has_header else None
+            
+            # Tentar ler com configurações padrão
+            try:
+                return pd.read_csv(file_path, header=header)
+            except:
+                # Se falhar, tentar detectar separador
+                return pd.read_csv(file_path, header=header, sep=None, engine='python')
+                
         except Exception as e:
             raise ValueError(f"Erro ao ler o CSV: {str(e)}")
     
